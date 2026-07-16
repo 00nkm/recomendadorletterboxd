@@ -2,7 +2,7 @@
 
 Esqueleto inicial do projeto de recomendação baseado em Letterboxd.
 
-Pré-requisitos:
+Pré-requisitos (cu)
 - Python 3.10+
 - Postgres com extensão `pgvector` (opcional para MVP)
 
