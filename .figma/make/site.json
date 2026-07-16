@@ -1,0 +1,10 @@
+{
+  "description": "Provides personalized movie recommendations based on Letterboxd profiles with filters and detailed match explanations in a clean, user-friendly interface.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

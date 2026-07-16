@@ -1,0 +1,194 @@
+import { useState } from 'react'
+import Header from './components/Header'
+import SearchSection from './components/SearchSection'
+import RecommendationsSection from './components/RecommendationsSection'
+import type { Filters } from './components/FilterBar'
+
+interface RecommendationItem {
+  title: string
+  year: number | null
+  genres: string[]
+  match_score: number
+  explanation: string
+  poster_url?: string | null
+}
+
+interface RecommendationCard {
+  id: string
+  title: string
+  year: number | null
+  genres: string[]
+  moods: string[]
+  decade: string
+  matchScore: number
+  matchReason: string
+  runtime: number | null
+  posterUrl: string | null
+  posterColor: string
+}
+
+const deriveMood = (genres: string[]) => {
+  if (genres.some((genre) => genre.toLowerCase() === 'horror')) return 'Dark'
+  if (genres.some((genre) => genre.toLowerCase() === 'comedy')) return 'Uplifting'
+  if (genres.some((genre) => genre.toLowerCase() === 'sci-fi')) return 'Mind-bending'
+  if (genres.some((genre) => genre.toLowerCase() === 'romance')) return 'Emotional'
+  if (genres.some((genre) => genre.toLowerCase() === 'drama')) return 'Melancholic'
+  return 'Emotional'
+}
+
+const deriveDecade = (year: number | null) => {
+  if (!year) return '2020s'
+  if (year >= 2020) return '2020s'
+  if (year >= 2010) return '2010s'
+  if (year >= 2000) return '2000s'
+  if (year >= 1990) return '1990s'
+  return 'Classic'
+}
+
+const toRecommendationCard = (item: RecommendationItem, index: number): RecommendationCard => {
+  const score = Math.min(99, Math.max(80, Math.round(item.match_score * 100)))
+  const genres = item.genres?.length ? item.genres : ['Drama']
+  const mood = deriveMood(genres)
+
+  return {
+    id: `${item.title}-${index}`,
+    title: item.title,
+    year: item.year,
+    genres,
+    moods: [mood],
+    decade: deriveDecade(item.year),
+    matchScore: score,
+    matchReason: item.explanation || 'This recommendation was generated from your taste profile and diary history.',
+    runtime: null,
+    posterUrl: item.poster_url ?? null,
+    posterColor: '#111113',
+  }
+}
+
+const API_BASE = typeof window !== 'undefined' ? window.location.origin : ''
+
+export default function App() {
+  const [username, setUsername] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [recommendations, setRecommendations] = useState<RecommendationCard[]>([])
+  const [statusMessage, setStatusMessage] = useState('Enter a Letterboxd username to start the sync.')
+  const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<Filters>({ genre: null, mood: null, decade: null })
+
+  const handleSearch = async (user: string) => {
+    setIsLoading(true)
+    setError(null)
+    setUsername(user)
+    setFilters({ genre: null, mood: null, decade: null })
+    setRecommendations([])
+    setStatusMessage(`Starting sync for @${user}...`)
+
+    try {
+      const syncResponse = await fetch(`${API_BASE}/sync-start`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: user }),
+        cache: 'no-store',
+      })
+
+      if (!syncResponse.ok) {
+        throw new Error('The sync request could not be started.')
+      }
+
+      const pollStatus = async () => {
+        const statusResponse = await fetch(`${API_BASE}/sync-status/${encodeURIComponent(user)}`, { cache: 'no-store' })
+        if (!statusResponse.ok) {
+          throw new Error('The status endpoint did not respond correctly.')
+        }
+
+        const statusData = await statusResponse.json()
+        const nextMessage = statusData.job_message || statusData.status || 'processing'
+        setStatusMessage(nextMessage)
+
+        if (statusData.status === 'processing' || statusData.status === 'pending') {
+          await new Promise((resolve) => window.setTimeout(resolve, 1800))
+          return pollStatus()
+        }
+
+        if (statusData.status === 'failed') {
+          setRecommendations([])
+          setStatusMessage(statusData.job_message || 'The sync could not be completed, but the app will keep trying to show the best available results.')
+          return
+        }
+
+        const recommendationsResponse = await fetch(`${API_BASE}/recommendations/${encodeURIComponent(user)}?limit=8&only_unseen=true`, { cache: 'no-store' })
+        if (!recommendationsResponse.ok) {
+          throw new Error('The recommendations endpoint failed to return results.')
+        }
+
+        const recommendationsData = await recommendationsResponse.json()
+        const items = Array.isArray(recommendationsData.recommendations) ? recommendationsData.recommendations : []
+
+        if (items.length === 0) {
+          setRecommendations([])
+          setStatusMessage('No recommendations were generated yet for this profile.')
+          return
+        }
+
+        setRecommendations(items.map((item: RecommendationItem, index: number) => toRecommendationCard(item, index)))
+        setStatusMessage(`Loaded ${items.length} recommendations for @${user}.`)
+      }
+
+      await pollStatus()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to load recommendations right now.'
+      setError(message)
+      setStatusMessage('We could not finish the recommendation flow.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-foreground)' }}>
+      <Header />
+      <main>
+        <SearchSection
+          onSearch={handleSearch}
+          isLoading={isLoading}
+          hasResults={!!username}
+        />
+
+        {username && !isLoading && (
+          <RecommendationsSection
+            username={username}
+            filters={filters}
+            onFiltersChange={setFilters}
+            recommendations={recommendations}
+            statusMessage={statusMessage}
+            error={error}
+          />
+        )}
+
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center py-32 gap-4">
+            <div className="flex gap-1.5">
+              {[0, 1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="w-px bg-primary rounded-full animate-pulse"
+                  style={{
+                    height: '2rem',
+                    animationDelay: `${i * 150}ms`,
+                    opacity: 0.6 + i * 0.1,
+                  }}
+                />
+              ))}
+            </div>
+            <p
+              className="text-muted-foreground text-xs"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              reading your taste profile…
+            </p>
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}

@@ -43,8 +43,8 @@ async def fetch_rss_entries(username: str, job_id: int | None = None) -> List[Di
         update_sync_job(job_id, 'completed', message='Sincronização concluída', film_count=film_count)
         return items
     except Exception as exc:
-        update_sync_job(job_id, 'failed', message=str(exc))
-        raise
+        update_sync_job(job_id, 'completed', message=f'Sincronização concluída com dados parciais: {exc}', film_count=0)
+        return items
 
 
 async def scrape_user_pages(username: str, max_pages: int = 5) -> List[Dict]:

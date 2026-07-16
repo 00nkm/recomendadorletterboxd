@@ -1,0 +1,104 @@
+import { useState, type FormEvent } from 'react'
+
+interface SearchSectionProps {
+  onSearch: (username: string) => void
+  isLoading: boolean
+  hasResults: boolean
+}
+
+export default function SearchSection({ onSearch, isLoading, hasResults }: SearchSectionProps) {
+  const [value, setValue] = useState('')
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    if (value.trim()) onSearch(value.trim())
+  }
+
+  return (
+    <section className={`transition-all duration-700 ${hasResults ? 'py-10 border-b border-border' : 'py-24 md:py-36'}`}>
+      <div className="max-w-2xl mx-auto px-6">
+        {!hasResults && (
+          <>
+            <p
+              className="text-muted-foreground text-xs tracking-widest uppercase mb-6"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              film recommendations
+            </p>
+            <h1
+              className="text-foreground mb-3 leading-tight"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 'clamp(2rem, 5vw, 3.25rem)',
+                fontWeight: 700,
+              }}
+            >
+              Your next favourite film
+              <br />
+              <span style={{ fontStyle: 'italic', color: 'var(--color-primary)' }}>
+                is already in your diary.
+              </span>
+            </h1>
+            <p className="text-secondary-foreground text-base mb-10 max-w-lg leading-relaxed">
+              We analyze your Letterboxd taste profile — what you've loved, skipped, and obsessed over — and surface films built for exactly how you watch.
+            </p>
+          </>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex gap-3">
+          <div className="flex-1 relative">
+            <span
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm select-none pointer-events-none"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              letterboxd.com/
+            </span>
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="yourusername"
+              className="w-full bg-card border border-border text-foreground placeholder-muted-foreground
+                         rounded-sm outline-none transition-all duration-200 text-sm
+                         focus:border-primary focus:ring-1 focus:ring-ring"
+              style={{
+                paddingLeft: '8.75rem',
+                paddingRight: '1rem',
+                paddingTop: '0.75rem',
+                paddingBottom: '0.75rem',
+                fontFamily: 'var(--font-sans)',
+              }}
+              disabled={isLoading}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isLoading || !value.trim()}
+            className="bg-primary text-primary-foreground text-sm font-medium px-6 py-3 rounded-sm
+                       transition-all duration-200 hover:opacity-90 active:scale-[0.98]
+                       disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            style={{ fontFamily: 'var(--font-sans)' }}
+          >
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                Analyzing
+              </span>
+            ) : (
+              'Get Recommendations'
+            )}
+          </button>
+        </form>
+
+        {!hasResults && (
+          <p className="text-muted-foreground text-xs mt-4 leading-relaxed">
+            We only read your public Letterboxd data. No account required.
+          </p>
+        )}
+      </div>
+    </section>
+  )
+}

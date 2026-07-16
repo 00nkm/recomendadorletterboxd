@@ -1,6 +1,6 @@
 import os
 from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from services.ingest.job import create_sync_job, get_latest_sync_job
@@ -19,6 +19,14 @@ class EnrichRequest(BaseModel):
 
 app = FastAPI(title="Recomendador Letterboxd - MVP")
 app.mount('/static', StaticFiles(directory=os.path.join(os.path.dirname(__file__), '..', 'web')), name='static')
+
+frontend_dir = os.path.join(os.path.dirname(__file__), '..', 'dist')
+if os.path.isdir(frontend_dir):
+    app.mount('/app', StaticFiles(directory=frontend_dir, html=True), name='frontend')
+
+@app.get('/')
+async def root():
+    return RedirectResponse(url='/app/', status_code=307)
 
 
 class SyncRequest(BaseModel):
@@ -78,11 +86,6 @@ async def recommendations(
         except Exception:
             pass
     return {"username": username, "recommendations": recs}
-
-
-@app.get('/', response_class=HTMLResponse)
-async def root():
-    return FileResponse(os.path.join(os.path.dirname(__file__), '..', 'web', 'index.html'))
 
 
 @app.post('/enrich')
