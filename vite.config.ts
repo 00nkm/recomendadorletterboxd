@@ -9,9 +9,10 @@ import siteConfiguration from './.figma/make/site.json'
 export default defineConfig(({ mode }) => {
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === 'development'
+  const isVercelDeploy = Boolean(process.env.VERCEL || process.env.VERCEL_ENV)
 
   return {
-    base: '/app/',
+    base: isVercelDeploy ? '/' : '/app/',
     build: {
       sourcemap: emitSourcemaps ? 'inline' : false,
       minify: !emitSourcemaps,
