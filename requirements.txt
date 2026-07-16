@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+httpx
+sqlalchemy
+psycopg2-binary
+pydantic
+python-dotenv
+openai
+pgvector
+redis
+aiohttp
+numpy
