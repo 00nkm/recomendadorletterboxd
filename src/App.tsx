@@ -3,6 +3,7 @@ import Header from './components/Header'
 import SearchSection from './components/SearchSection'
 import RecommendationsSection from './components/RecommendationsSection'
 import type { Filters } from './components/FilterBar'
+import { mockMovies } from './data/mockMovies'
 
 interface RecommendationItem {
   title: string
@@ -65,7 +66,21 @@ const toRecommendationCard = (item: RecommendationItem, index: number): Recommen
   }
 }
 
-const API_BASE = typeof window !== 'undefined' ? window.location.origin : ''
+const toMockRecommendationCard = (item: (typeof mockMovies)[number], index: number): RecommendationCard => ({
+  id: `${item.title}-${index}`,
+  title: item.title,
+  year: item.year,
+  genres: item.genres?.length ? item.genres : ['Drama'],
+  moods: item.moods?.length ? item.moods : [deriveMood(item.genres)],
+  decade: item.decade || deriveDecade(item.year),
+  matchScore: item.matchScore,
+  matchReason: item.matchReason || 'This demo recommendation is shown because the live backend is unavailable.',
+  runtime: item.runtime,
+  posterUrl: item.posterUrl || null,
+  posterColor: item.posterColor,
+})
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '')
 
 export default function App() {
   const [username, setUsername] = useState<string | null>(null)
@@ -138,7 +153,10 @@ export default function App() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to load recommendations right now.'
       setError(message)
-      setStatusMessage('We could not finish the recommendation flow.')
+
+      const demoItems = mockMovies.slice(0, 8)
+      setRecommendations(demoItems.map((movie, index) => toMockRecommendationCard(movie, index)))
+      setStatusMessage('The live recommendation backend is unavailable right now, so the app is showing demo recommendations instead.')
     } finally {
       setIsLoading(false)
     }
