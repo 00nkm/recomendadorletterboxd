@@ -1,10 +1,10 @@
 import json
 import os
+import httpx
 from typing import List, Dict
 from services.database import SessionLocal
 from services.models import User, UserFilm, Film
 from services.enrichment.enrich_job import enrich_and_save_film
-import google.generativeai as genai
 
 def _build_poster_url(film: Film) -> str | None:
     if film.poster_path:
@@ -31,10 +31,6 @@ async def recommend_for_user(
         favoritos = [film_lookup[uf.film_id].title for uf in user_films if uf.favorite and uf.film_id in film_lookup]
         assistidos = [film_lookup[uf.film_id].title for uf in user_films if uf.film_id in film_lookup][:25]
         
-        # Configuração da API do Gemini
-        genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-        model = genai.GenerativeModel('gemini-1.5-flash', generation_config={"response_mime_type": "application/json"})
-        
         perfil = (
             f"O perfil {username} tem preferência pelas obras: {', '.join(favoritos[:10])}. "
             f"Histórico recente: {', '.join(assistidos)}. "
@@ -54,10 +50,25 @@ async def recommend_for_user(
             "Responda estritamente com um JSON nesta estrutura: "
             "{\"recommendations\": [{\"title\": \"Nome Original em Inglês\", \"year\": 2000, \"match_score\": 95, \"explanation\": \"Justificativa técnica da escolha.\"}]}"
         )
+
+        # Chamada REST direta para a API do Gemini via httpx (MUITO mais leve)
+        api_key = os.getenv('GEMINI_API_KEY')
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
         
-        # Chamada ao modelo Gemini
-        response = model.generate_content(prompt)
-        data = json.loads(response.text)
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "responseMimeType": "application/json"
+            }
+        }
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resposta = await client.post(url, json=payload)
+            resposta.raise_for_status()
+            dados_gemini = resposta.json()
+            
+            texto_json = dados_gemini["candidates"][0]["content"]["parts"][0]["text"]
+            data = json.loads(texto_json)
         
         rec_list = data.get('recommendations', [])
         
