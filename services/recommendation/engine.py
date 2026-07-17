@@ -52,13 +52,10 @@ async def recommend_for_user(
         )
 
         api_key = os.getenv('GEMINI_API_KEY', '').strip()
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
         
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "responseMimeType": "application/json"
-            }
+            "contents": [{"parts": [{"text": prompt}]}]
         }
         
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -71,7 +68,9 @@ async def recommend_for_user(
             dados_gemini = resposta.json()
             
             texto_json = dados_gemini["candidates"][0]["content"]["parts"][0]["text"]
-            data = json.loads(texto_json)
+            
+            texto_limpo = texto_json.replace("```json", "").replace("```", "").strip()
+            data = json.loads(texto_limpo)
         
         rec_list = data.get('recommendations', [])
         
