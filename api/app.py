@@ -32,14 +32,11 @@ async def root():
 class SyncRequest(BaseModel):
     username: str
 
-
 @app.post('/sync-start')
 async def sync_start(req: SyncRequest):
     job = create_sync_job(req.username)
-    
-    # Processamento bloqueante garante a conclusão no Vercel
+    # O await garante que o Vercel não corte o processo
     await fetch_rss_entries(req.username, job_id=job.id)
-    
     return {"status": "sync_completed", "username": req.username, "job_id": job.id}
 
 
