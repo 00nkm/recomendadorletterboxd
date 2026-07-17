@@ -4,7 +4,7 @@ from typing import List, Dict
 from services.database import SessionLocal
 from services.models import User, UserFilm, Film
 from services.enrichment.enrich_job import enrich_and_save_film
-import openai
+import google.generativeai as genai
 
 def _build_poster_url(film: Film) -> str | None:
     if film.poster_path:
@@ -31,7 +31,9 @@ async def recommend_for_user(
         favoritos = [film_lookup[uf.film_id].title for uf in user_films if uf.favorite and uf.film_id in film_lookup]
         assistidos = [film_lookup[uf.film_id].title for uf in user_films if uf.film_id in film_lookup][:25]
         
-        client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        # Configuração da API do Gemini
+        genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+        model = genai.GenerativeModel('gemini-1.5-flash', generation_config={"response_mime_type": "application/json"})
         
         perfil = (
             f"O perfil {username} tem preferência pelas obras: {', '.join(favoritos[:10])}. "
@@ -49,22 +51,18 @@ async def recommend_for_user(
             f"{filtros}"
             "Encontre paralelos do gosto do usuário em tópicos do r/TrueFilm, r/movies do Reddit e listas aclamadas do Letterboxd. "
             f"Gere {limit} indicações excelentes que o usuário não tenha visto. "
-            "Responda estritamente com um JSON: "
+            "Responda estritamente com um JSON nesta estrutura: "
             "{\"recommendations\": [{\"title\": \"Nome Original em Inglês\", \"year\": 2000, \"match_score\": 95, \"explanation\": \"Justificativa técnica da escolha.\"}]}"
         )
         
-        response = client.chat.completions.create(
-            model=os.getenv('OPENAI_CHAT_MODEL', 'gpt-4o-mini'),
-            messages=[{"role": "user", "content": prompt}],
-            response_format={ "type": "json_object" }
-        )
+        # Chamada ao modelo Gemini
+        response = model.generate_content(prompt)
+        data = json.loads(response.text)
         
-        data = json.loads(response.choices[0].message.content)
         rec_list = data.get('recommendations', [])
         
         results = []
         for item in rec_list:
-            # O backend localiza o poster real no TMDB antes de enviar ao frontend
             film_obj = await enrich_and_save_film(db, item['title'])
             
             results.append({
