@@ -51,9 +51,14 @@ async def recommend_for_user(
             "{\"recommendations\": [{\"title\": \"Nome Original em Inglês\", \"year\": 2000, \"match_score\": 95, \"explanation\": \"Justificativa técnica da escolha.\"}]}"
         )
 
-        # Chamada REST direta para a API do Gemini via httpx (MUITO mais leve)
         api_key = os.getenv('GEMINI_API_KEY')
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        
+        # Injeção da chave de autenticação nos cabeçalhos
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key
+        }
         
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -63,7 +68,7 @@ async def recommend_for_user(
         }
         
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resposta = await client.post(url, json=payload)
+            resposta = await client.post(url, headers=headers, json=payload)
             resposta.raise_for_status()
             dados_gemini = resposta.json()
             
