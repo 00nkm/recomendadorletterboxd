@@ -1,5 +1,23 @@
 {
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
-  "framework": "vite"
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/sync-start",
+      "destination": "/api/app.py"
+    },
+    {
+      "source": "/sync-status/:path*",
+      "destination": "/api/app.py"
+    },
+    {
+      "source": "/recommendations/:path*",
+      "destination": "/api/app.py"
+    },
+    {
+      "source": "/enrich",
+      "destination": "/api/app.py"
+    }
+  ]
 }
