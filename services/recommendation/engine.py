@@ -52,7 +52,9 @@ async def recommend_for_user(
         )
 
         api_key = os.getenv('GEMINI_API_KEY', '').strip()
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        
+        # O sufixo -latest foi adicionado ao nome do modelo na URL
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
         
         payload = {
             "contents": [{"parts": [{"text": prompt}]}]
