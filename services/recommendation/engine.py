@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import httpx
 from typing import List, Dict
 from services.database import SessionLocal
@@ -69,8 +70,14 @@ async def recommend_for_user(
             
             texto_json = dados_gemini["candidates"][0]["content"]["parts"][0]["text"]
             
-            texto_limpo = texto_json.replace("```json", "").replace("```", "").strip()
-            data = json.loads(texto_limpo)
+            try:
+                # Extrai apenas o conteúdo entre as chaves principais
+                match = re.search(r'\{.*\}', texto_json, re.DOTALL)
+                texto_limpo = match.group(0) if match else texto_json
+                data = json.loads(texto_limpo)
+            except Exception as e:
+                print(f"Falha ao processar o JSON: {e} | Retorno original: {texto_json}")
+                data = {"recommendations": []}
         
         rec_list = data.get('recommendations', [])
         
