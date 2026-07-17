@@ -34,10 +34,13 @@ class SyncRequest(BaseModel):
 
 
 @app.post('/sync-start')
-async def sync_start(req: SyncRequest, background_tasks: BackgroundTasks):
+async def sync_start(req: SyncRequest):
     job = create_sync_job(req.username)
-    background_tasks.add_task(fetch_rss_entries, req.username, job_id=job.id)
-    return {"status": "sync_started", "username": req.username, "job_id": job.id}
+    
+    # Processamento bloqueante garante a conclusão no Vercel
+    await fetch_rss_entries(req.username, job_id=job.id)
+    
+    return {"status": "sync_completed", "username": req.username, "job_id": job.id}
 
 
 @app.get('/sync-status/{username}')
