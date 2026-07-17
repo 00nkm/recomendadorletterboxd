@@ -52,30 +52,37 @@ async def recommend_for_user(
             "{\"recommendations\": [{\"title\": \"Nome Original em Inglês\", \"year\": 2000, \"match_score\": 95, \"explanation\": \"Justificativa técnica da escolha.\"}]}"
         )
 
-        api_key = os.getenv('GEMINI_API_KEY', '').strip()
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
+        api_key = os.getenv('GROQ_API_KEY', '').strip()
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
         
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}]
+            "model": "llama3-70b-8192",
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.7
         }
         
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resposta = await client.post(url, json=payload)
+            resposta = await client.post(url, headers=headers, json=payload)
             
             if resposta.status_code != 200:
-                print(f"Erro na API do Google: {resposta.text}")
+                print(f"Erro na API do Groq: {resposta.text}")
                 
             resposta.raise_for_status()
-            dados_gemini = resposta.json()
+            dados_groq = resposta.json()
             
             try:
-                texto_json = dados_gemini["candidates"][0]["content"]["parts"][0]["text"]
-                # A Regex extrai estritamente o conteúdo entre as chaves, blindando o código
+                texto_json = dados_groq["choices"][0]["message"]["content"]
                 match = re.search(r'\{.*\}', texto_json, re.DOTALL)
                 texto_limpo = match.group(0) if match else texto_json
                 data = json.loads(texto_limpo)
             except Exception as e:
-                print(f"Falha ao processar o JSON: {e} | Retorno original: {dados_gemini}")
+                print(f"Falha ao processar o JSON: {e} | Retorno original: {dados_groq}")
                 data = {"recommendations": []}
         
         rec_list = data.get('recommendations', [])
