@@ -51,14 +51,8 @@ async def recommend_for_user(
             "{\"recommendations\": [{\"title\": \"Nome Original em Inglês\", \"year\": 2000, \"match_score\": 95, \"explanation\": \"Justificativa técnica da escolha.\"}]}"
         )
 
-        api_key = os.getenv('GEMINI_API_KEY')
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-        
-        # Injeção da chave de autenticação nos cabeçalhos
-        headers = {
-            "Content-Type": "application/json",
-            "x-goog-api-key": api_key
-        }
+        api_key = os.getenv('GEMINI_API_KEY', '').strip()
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
         
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -68,7 +62,11 @@ async def recommend_for_user(
         }
         
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resposta = await client.post(url, headers=headers, json=payload)
+            resposta = await client.post(url, json=payload)
+            
+            if resposta.status_code != 200:
+                print(f"Erro na API do Google: {resposta.text}")
+                
             resposta.raise_for_status()
             dados_gemini = resposta.json()
             
