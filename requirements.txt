@@ -10,3 +10,4 @@ pgvector
 redis
 aiohttp
 numpy
+beautifulsoup4
