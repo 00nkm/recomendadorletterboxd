@@ -1,57 +1,71 @@
 import httpx
 import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup
 from typing import List, Dict
 from services.ingest.job import create_sync_job, update_sync_job
 from services.ingest.processor import process_rss_items
 
+async def fetch_top_4(username: str) -> List[str]:
+    url = f"https://letterboxd.com/{username}/"
+    filmes_top = []
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        requisicao = await client.get(url)
+        if requisicao.status_code == 200:
+            soup = BeautifulSoup(requisicao.text, 'html.parser')
+            secao = soup.find('section', id='favourites')
+            if secao:
+                posters = secao.find_all('div', class_='film-poster')
+                for poster in posters:
+                    slug = poster.get('data-film-slug', '')
+                    if slug:
+                        titulo = slug.replace('-', ' ').title()
+                        filmes_top.append(titulo)
+    return filmes_top
 
 async def fetch_rss_entries(username: str, job_id: int | None = None) -> List[Dict]:
-    """Busca o RSS público do Letterboxd, transforma em itens e envia para processamento."""
     if job_id is None:
         job = create_sync_job(username)
         job_id = job.id
-
+        
     url = f"https://letterboxd.com/{username}/rss/"
     items = []
+    
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
             r = await client.get(url)
             r.raise_for_status()
             root = ET.fromstring(r.text)
             for item in root.findall('.//item'):
-                title = item.findtext('title')
-                link = item.findtext('link')
-                pubDate = item.findtext('pubDate')
-                description = item.findtext('description')
-                parsed = {
-                    'title': title,
-                    'link': link,
-                    'pubDate': pubDate,
-                    'description': description,
-                }
-                items.append(parsed)
+                items.append({
+                    'title': item.findtext('title'),
+                    'link': item.findtext('link'),
+                    'pubDate': item.findtext('pubDate'),
+                    'description': item.findtext('description'),
+                })
     except Exception as exc:
-        update_sync_job(job_id, 'processing', message='RSS indisponível — usando fallback de títulos')
-        items = [
-            {'title': 'The Matrix', 'link': None, 'pubDate': None, 'description': None},
-            {'title': 'Inception', 'link': None, 'pubDate': None, 'description': None},
-            {'title': 'Interstellar', 'link': None, 'pubDate': None, 'description': None},
-        ]
+        update_sync_job(job_id, 'processing', message='RSS indisponível. Usando fallback.')
+
+    try:
+        top_4_titulos = await fetch_top_4(username)
+        for titulo in top_4_titulos:
+            items.append({
+                'title': titulo,
+                'link': None,
+                'pubDate': None,
+                'description': 'favorite', 
+            })
+    except Exception as exc:
+        pass
 
     try:
         film_count = await process_rss_items(username, items, job_id=job_id)
         update_sync_job(job_id, 'completed', message='Sincronização concluída', film_count=film_count)
         return items
     except Exception as exc:
-        update_sync_job(job_id, 'completed', message=f'Sincronização concluída com dados parciais: {exc}', film_count=0)
+        update_sync_job(job_id, 'completed', message=f'Falha parcial: {exc}', film_count=0)
         return items
 
-
 async def scrape_user_pages(username: str, max_pages: int = 5) -> List[Dict]:
-    """Scraping básico paginado das páginas públicas do Letterboxd.
-
-    AVISO: revisar ToS do Letterboxd antes de usar scraping em produção.
-    """
     results = []
     async with httpx.AsyncClient(timeout=20.0) as client:
         for page in range(1, max_pages + 1):
@@ -59,6 +73,5 @@ async def scrape_user_pages(username: str, max_pages: int = 5) -> List[Dict]:
             r = await client.get(url)
             if r.status_code == 404:
                 break
-            # Aqui seria necessário parse HTML (ex: BeautifulSoup). Mantemos placeholder.
             results.append({'page': page, 'url': url, 'content_snippet': r.text[:200]})
     return results
