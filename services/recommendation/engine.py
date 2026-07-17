@@ -53,7 +53,7 @@ async def recommend_for_user(
         )
 
         api_key = os.getenv('GEMINI_API_KEY', '').strip()
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
         
         payload = {
             "contents": [{"parts": [{"text": prompt}]}]
@@ -68,15 +68,14 @@ async def recommend_for_user(
             resposta.raise_for_status()
             dados_gemini = resposta.json()
             
-            texto_json = dados_gemini["candidates"][0]["content"]["parts"][0]["text"]
-            
             try:
-                # Extrai apenas o conteúdo entre as chaves principais
+                texto_json = dados_gemini["candidates"][0]["content"]["parts"][0]["text"]
+                # A Regex extrai estritamente o conteúdo entre as chaves, blindando o código
                 match = re.search(r'\{.*\}', texto_json, re.DOTALL)
                 texto_limpo = match.group(0) if match else texto_json
                 data = json.loads(texto_limpo)
             except Exception as e:
-                print(f"Falha ao processar o JSON: {e} | Retorno original: {texto_json}")
+                print(f"Falha ao processar o JSON: {e} | Retorno original: {dados_gemini}")
                 data = {"recommendations": []}
         
         rec_list = data.get('recommendations', [])
