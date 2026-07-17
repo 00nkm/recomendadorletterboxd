@@ -5,6 +5,4 @@ sqlalchemy
 psycopg2-binary
 pydantic
 python-dotenv
-aiohttp
 beautifulsoup4
-google-generativeai
