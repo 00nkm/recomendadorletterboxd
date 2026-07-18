@@ -22,6 +22,22 @@ async def fetch_top_4(username: str) -> List[str]:
                         filmes_top.append(titulo)
     return filmes_top
 
+# Nova função para quebrar o limite do RSS e puxar a página da tag inteira
+async def fetch_tagged_films(username: str, tag: str) -> List[str]:
+    url = f"https://letterboxd.com/{username}/tag/{tag}/films/"
+    filmes_tag = []
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        requisicao = await client.get(url)
+        if requisicao.status_code == 200:
+            soup = BeautifulSoup(requisicao.text, 'html.parser')
+            posters = soup.find_all('div', class_='film-poster')
+            for poster in posters:
+                slug = poster.get('data-film-slug', '')
+                if slug:
+                    titulo = slug.replace('-', ' ').title()
+                    filmes_tag.append(titulo)
+    return filmes_tag
+
 async def fetch_rss_entries(username: str, job_id: int | None = None) -> List[Dict]:
     if job_id is None:
         job = create_sync_job(username)
@@ -38,13 +54,12 @@ async def fetch_rss_entries(username: str, job_id: int | None = None) -> List[Di
             for item in root.findall('.//item'):
                 # Captura todas as tags inseridas na review
                 categories = [cat.text for cat in item.findall('category') if cat.text]
-                
                 items.append({
                     'title': item.findtext('title'),
                     'link': item.findtext('link'),
                     'pubDate': item.findtext('pubDate'),
                     'description': item.findtext('description'),
-                    'tags': categories, # <-- Novo campo
+                    'tags': categories,
                 })
     except Exception as exc:
         update_sync_job(job_id, 'processing', message='RSS indisponível. Usando fallback.')
@@ -56,9 +71,24 @@ async def fetch_rss_entries(username: str, job_id: int | None = None) -> List[Di
                 'title': titulo,
                 'link': None,
                 'pubDate': None,
-                'description': 'favorite', 
+                'description': 'favorite',
+                'tags': []
             })
-    except Exception as exc:
+    except Exception:
+        pass
+
+    # Garante a injeção forçada dos filmes assistidos em casal
+    try:
+        tagged_titulos = await fetch_tagged_films(username, 'nenoca')
+        for titulo in tagged_titulos:
+            items.append({
+                'title': titulo,
+                'link': None,
+                'pubDate': None,
+                'description': '',
+                'tags': ['nenoca']
+            })
+    except Exception:
         pass
 
     try:
