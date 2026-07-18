@@ -15,6 +15,8 @@ def _build_poster_url(film: Film) -> str | None:
 async def recommend_for_user(
     username: str,
     limit: int = 10,
+    page: int = 1,
+    reference_movie: str | None = None,
     genre: str | None = None,
     min_year: int | None = None,
     max_year: int | None = None,
@@ -30,7 +32,10 @@ async def recommend_for_user(
         film_lookup = {film.id: film for film in db.query(Film).all()}
         
         favoritos = [film_lookup[uf.film_id].title for uf in user_films if uf.favorite and uf.film_id in film_lookup]
-        assistidos = [film_lookup[uf.film_id].title for uf in user_films if uf.film_id in film_lookup][:25]
+        
+        # O sistema agora isola os filmes rejeitados para alimentar o filtro negativo da IA
+        disliked = [film_lookup[uf.film_id].title for uf in user_films if getattr(uf, 'disliked', False) and uf.film_id in film_lookup]
+        assistidos = [film_lookup[uf.film_id].title for uf in user_films if uf.film_id in film_lookup and not getattr(uf, 'disliked', False)][:30]
         
         perfil = (
             f"O perfil {username} tem preferência pelas obras: {', '.join(favoritos[:10])}. "
@@ -42,6 +47,14 @@ async def recommend_for_user(
             filtros += f"Traga apenas o gênero {genre}. "
         if min_year and max_year:
             filtros += f"Somente títulos lançados entre {min_year} e {max_year}. "
+        if disliked:
+            filtros += f"NÃO RECOMENDE os seguintes filmes, o usuário marcou que não gostou deles: {', '.join(disliked[:10])}. "
+            
+        if reference_movie:
+            filtros += f"ATENÇÃO MÁXIMA: O usuário pediu filmes especificamente parecidos com '{reference_movie}'. Use esse filme como âncora principal da curadoria. "
+
+        if page > 1:
+            filtros += f"Esta é a página {page} de busca. Pule os resultados mais óbvios e comerciais. Traga joias escondidas (hidden gems) que se encaixem perfeitamente no perfil. "
             
         prompt = (
             f"Você atua como um curador cinematográfico de alto nível. Analise as informações: {perfil} "
@@ -60,11 +73,14 @@ async def recommend_for_user(
             "Content-Type": "application/json"
         }
         
+        # A matemática da temperatura evita repetições em consultas sucessivas
+        temperatura_calculada = 0.7 if page == 1 else min(0.95, 0.7 + (page * 0.05))
+        
         payload = {
             "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"},
-            "temperature": 0.7
+            "temperature": temperatura_calculada
         }
         
         async with httpx.AsyncClient(timeout=30.0) as client:
