@@ -120,7 +120,11 @@ async def recommend_for_user(
             })
             
         return results
-    async def recommend_for_couple(user1_username: str, user2_username: str, limit: int = 6) -> Dict:
+    finally:
+        db.close()
+
+
+async def recommend_for_couple(user1_username: str, user2_username: str, limit: int = 6) -> Dict:
     db = SessionLocal()
     try:
         u1 = db.query(User).filter(User.username == user1_username).one_or_none()
@@ -235,9 +239,5 @@ async def recommend_for_user(
             })
             
         return {"watched_together": watched_together, "recommendations": results}
-    finally:
-        db.close()
-
-
     finally:
         db.close()
