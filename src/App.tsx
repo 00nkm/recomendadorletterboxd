@@ -6,6 +6,7 @@ import type { Filters } from './components/FilterBar'
 import { mockMovies } from './data/mockMovies'
 
 interface RecommendationItem {
+  tmdb_id: number
   title: string
   year: number | null
   genres: string[]
@@ -16,6 +17,7 @@ interface RecommendationItem {
 
 interface RecommendationCard {
   id: string
+  tmdb_id: number
   title: string
   year: number | null
   genres: string[]
@@ -50,9 +52,9 @@ const toRecommendationCard = (item: RecommendationItem, index: number): Recommen
   const score = Math.min(99, Math.max(80, Math.round(item.match_score * 100)))
   const genres = item.genres?.length ? item.genres : ['Drama']
   const mood = deriveMood(genres)
-
   return {
-    id: `${item.title}-${index}`,
+    id: `${item.title}-${index}-${Date.now()}`,
+    tmdb_id: item.tmdb_id || 0,
     title: item.title,
     year: item.year,
     genres,
@@ -67,7 +69,8 @@ const toRecommendationCard = (item: RecommendationItem, index: number): Recommen
 }
 
 const toMockRecommendationCard = (item: (typeof mockMovies)[number], index: number): RecommendationCard => ({
-  id: `${item.title}-${index}`,
+  id: `${item.title}-${index}-${Date.now()}`,
+  tmdb_id: item.id,
   title: item.title,
   year: item.year,
   genres: item.genres?.length ? item.genres : ['Drama'],
@@ -84,16 +87,21 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undef
 
 export default function App() {
   const [username, setUsername] = useState<string | null>(null)
+  const [referenceMovie, setReferenceMovie] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
   const [recommendations, setRecommendations] = useState<RecommendationCard[]>([])
   const [statusMessage, setStatusMessage] = useState('Enter a Letterboxd username to start the sync.')
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<Filters>({ genre: null, mood: null, decade: null })
 
-  const handleSearch = async (user: string) => {
+  const handleSearch = async (user: string, refMovie: string) => {
     setIsLoading(true)
     setError(null)
     setUsername(user)
+    setReferenceMovie(refMovie)
+    setPage(1)
     setFilters({ genre: null, mood: null, decade: null })
     setRecommendations([])
     setStatusMessage(`Starting sync for @${user}...`)
@@ -105,7 +113,6 @@ export default function App() {
         body: JSON.stringify({ username: user }),
         cache: 'no-store',
       })
-
       if (!syncResponse.ok) {
         throw new Error('The sync request could not be started.')
       }
@@ -115,7 +122,6 @@ export default function App() {
         if (!statusResponse.ok) {
           throw new Error('The status endpoint did not respond correctly.')
         }
-
         const statusData = await statusResponse.json()
         const nextMessage = statusData.job_message || statusData.status || 'processing'
         setStatusMessage(nextMessage)
@@ -131,7 +137,10 @@ export default function App() {
           return
         }
 
-        const recommendationsResponse = await fetch(`${API_BASE}/recommendations/${encodeURIComponent(user)}?limit=8&only_unseen=true`, { cache: 'no-store' })
+        const queryParams = new URLSearchParams({ limit: '8', only_unseen: 'true', page: '1' })
+        if (refMovie) queryParams.append('reference_movie', refMovie)
+
+        const recommendationsResponse = await fetch(`${API_BASE}/recommendations/${encodeURIComponent(user)}?${queryParams.toString()}`, { cache: 'no-store' })
         if (!recommendationsResponse.ok) {
           throw new Error('The recommendations endpoint failed to return results.')
         }
@@ -153,12 +162,38 @@ export default function App() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to load recommendations right now.'
       setError(message)
-
       const demoItems = mockMovies.slice(0, 8)
       setRecommendations(demoItems.map((movie, index) => toMockRecommendationCard(movie, index)))
       setStatusMessage('The live recommendation backend is unavailable right now, so the app is showing demo recommendations instead.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleLoadMore = async () => {
+    if (!username) return
+    setIsLoadingMore(true)
+    const nextPage = page + 1
+
+    try {
+      const queryParams = new URLSearchParams({ limit: '8', only_unseen: 'true', page: nextPage.toString() })
+      if (referenceMovie) queryParams.append('reference_movie', referenceMovie)
+
+      const recommendationsResponse = await fetch(`${API_BASE}/recommendations/${encodeURIComponent(username)}?${queryParams.toString()}`, { cache: 'no-store' })
+      if (!recommendationsResponse.ok) throw new Error('Failed to load more recommendations.')
+
+      const recommendationsData = await recommendationsResponse.json()
+      const items = Array.isArray(recommendationsData.recommendations) ? recommendationsData.recommendations : []
+
+      setRecommendations((prev) => [
+        ...prev,
+        ...items.map((item: RecommendationItem, index: number) => toRecommendationCard(item, prev.length + index))
+      ])
+      setPage(nextPage)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsLoadingMore(false)
     }
   }
 
@@ -171,7 +206,6 @@ export default function App() {
           isLoading={isLoading}
           hasResults={!!username}
         />
-
         {username && !isLoading && (
           <RecommendationsSection
             username={username}
@@ -180,9 +214,10 @@ export default function App() {
             recommendations={recommendations}
             statusMessage={statusMessage}
             error={error}
+            onLoadMore={handleLoadMore}
+            isLoadingMore={isLoadingMore}
           />
         )}
-
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-32 gap-4">
             <div className="flex gap-1.5">
@@ -202,7 +237,7 @@ export default function App() {
               className="text-muted-foreground text-xs"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              reading your taste profile…
+              reading your taste profile
             </p>
           </div>
         )}
