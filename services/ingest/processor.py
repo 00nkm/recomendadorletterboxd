@@ -65,6 +65,7 @@ async def process_rss_items(username: str, items: List[Dict], job_id: int | None
                         rating=rating,
                         favorite='favorite' in (it.get('description') or '').lower() or 'favourite' in (it.get('description') or '').lower(),
                         in_watchlist='watchlist' in (it.get('description') or '').lower(),
+                        tags=it.get('tags', []) # <-- Novo campo
                     )
                     db.add(uf)
             except Exception:
