@@ -18,6 +18,10 @@
     {
       "source": "/enrich",
       "destination": "/api/app.py"
+    },
+    {
+      "source": "/feedback",
+      "destination": "/api/app.py"
     }
   ]
 }
