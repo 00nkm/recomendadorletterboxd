@@ -120,13 +120,9 @@ async def recommend_for_user(
             })
             
         return results
-    finally:
-        db.close()
-
-async def recommend_for_couple(user1_username: str, user2_username: str, limit: int = 6) -> Dict:
+    async def recommend_for_couple(user1_username: str, user2_username: str, limit: int = 6) -> Dict:
     db = SessionLocal()
     try:
-        # Busca os dois perfis no banco de dados
         u1 = db.query(User).filter(User.username == user1_username).one_or_none()
         u2 = db.query(User).filter(User.username == user2_username).one_or_none()
         
@@ -138,15 +134,12 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
         
         film_lookup = {film.id: film for film in db.query(Film).all()}
         
-        # Encontra a interseção dos filmes assistidos
         u1_film_ids = {uf.film_id for uf in u1_films}
         u2_film_ids = {uf.film_id for uf in u2_films}
         
-        # Isola os filmes que possuem a tag "nenoca" nos diários
         nenoca_ids_1 = {uf.film_id for uf in u1_films if getattr(uf, 'tags', None) and any('nenoca' in t.lower() for t in uf.tags)}
         nenoca_ids_2 = {uf.film_id for uf in u2_films if getattr(uf, 'tags', None) and any('nenoca' in t.lower() for t in uf.tags)}
         
-        # Une as interseções: Filmes marcados com a tag OU presentes nos dois diários
         common_film_ids = u1_film_ids.intersection(u2_film_ids).union(nenoca_ids_1).union(nenoca_ids_2)
         
         watched_together = []
@@ -166,24 +159,35 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
                     "rating": {"you": r1, "partner": r2}
                 })
                 
-        # Monta o perfil de gostos individuais
+        # Plano B: extrai os assistidos recentes caso os usuários não utilizem a função "Favoritos" no perfil
         fav1 = [film_lookup[uf.film_id].title for uf in u1_films if getattr(uf, 'favorite', False) and uf.film_id in film_lookup]
+        if not fav1:
+            fav1 = [film_lookup[uf.film_id].title for uf in u1_films if uf.film_id in film_lookup][:8]
+            
         fav2 = [film_lookup[uf.film_id].title for uf in u2_films if getattr(uf, 'favorite', False) and uf.film_id in film_lookup]
+        if not fav2:
+            fav2 = [film_lookup[uf.film_id].title for uf in u2_films if uf.film_id in film_lookup][:8]
+            
         disliked = [film_lookup[uf.film_id].title for uf in u1_films + u2_films if getattr(uf, 'disliked', False) and uf.film_id in film_lookup]
         
-        perfil = f"O parceiro 1 ({user1_username}) ama: {', '.join(fav1[:10])}. O parceiro 2 ({user2_username}) ama: {', '.join(fav2[:10])}. "
+        perfil = f"Parceiro 1 ({user1_username}) assiste/gosta de: {', '.join(fav1[:10])}. Parceiro 2 ({user2_username}) assiste/gosta de: {', '.join(fav2[:10])}. "
+        
+        # Envia as obras marcadas com a tag diretamente para o LLM aprender o padrão de vocês
+        juntos = [f["title"] for f in watched_together]
+        if juntos:
+            perfil += f"Obras marcantes que eles já assistiram juntos: {', '.join(juntos[:8])}. "
         
         filtros = ""
         if disliked:
-            filtros += f"NÃO RECOMENDE os seguintes filmes (eles odeiam): {', '.join(disliked[:10])}. "
+            filtros += f"Jamais indique os seguintes títulos: {', '.join(disliked[:10])}. "
             
         prompt = (
             f"Você atua como um curador cinematográfico focado em casais. Analise os perfis: {perfil} "
             f"{filtros}"
-            "Identifique padrões subjacentes e cruze os gostos. "
-            f"Gere {limit} indicações para um encontro perfeito. É crucial que você fuja do óbvio. "
+            "Identifique padrões subjacentes e cruze os gostos de forma inteligente. "
+            f"Gere {limit} indicações para um encontro excelente, priorizando tramas envolventes. Fuja das recomendações genéricas. "
             "Responda estritamente com um JSON nesta estrutura: "
-            "{\"recommendations\": [{\"title\": \"Nome Original em Inglês\", \"year\": 2000, \"match_score\": 95, \"explanation\": \"Justifique como a estética e a narrativa do filme atende aos dois gostos.\"}]}"
+            "{\"recommendations\": [{\"title\": \"Nome Original em Inglês\", \"year\": 2000, \"match_score\": 95, \"explanation\": \"Justifique brevemente como o filme atende aos dois gostos.\"}]}"
         )
         
         api_key = os.getenv('GROQ_API_KEY', '').strip()
@@ -198,7 +202,7 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
             "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"},
-            "temperature": 0.75
+            "temperature": 0.70
         }
         
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -231,5 +235,9 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
             })
             
         return {"watched_together": watched_together, "recommendations": results}
+    finally:
+        db.close()
+
+
     finally:
         db.close()
