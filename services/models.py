@@ -37,6 +37,7 @@ class Film(Base):
 
 class UserFilm(Base):
     __tablename__ = 'user_films'
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'))
     film_id = Column(Integer, ForeignKey('films.id'))
@@ -45,11 +46,11 @@ class UserFilm(Base):
     rating = Column(Integer)
     in_watchlist = Column(Boolean, default=False)
     favorite = Column(Boolean, default=False)
+    disliked = Column(Boolean, default=False) # Nova coluna adicionada
     review = Column(Text)
 
     user = relationship('User')
     film = relationship('Film')
-
 
 class FilmEmbedding(Base):
     __tablename__ = 'film_embeddings'
