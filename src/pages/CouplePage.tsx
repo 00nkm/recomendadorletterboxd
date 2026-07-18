@@ -25,7 +25,6 @@ interface CoupleRec {
   genres: string[]
 }
 
-// Sub-componentes (Mantenha o seu StarRating, WatchedCard e RecCard inalterados)
 function StarRating({ value, max = 5 }: { value: number; max?: number }) {
   return (
     <div className="flex gap-0.5">
@@ -46,7 +45,7 @@ function StarRating({ value, max = 5 }: { value: number; max?: number }) {
   )
 }
 
-function WatchedCard({ film }: { film: CoupleMovie }) {
+function WatchedCard({ film, user1, user2 }: { film: CoupleMovie, user1: string, user2: string }) {
   return (
     <div
       className="border border-border rounded-sm overflow-hidden flex flex-col transition-all duration-200 hover:border-[#c97d8a]/30"
@@ -74,12 +73,12 @@ function WatchedCard({ film }: { film: CoupleMovie }) {
         {film.rating && (
           <div className="flex items-center gap-3 pt-1 border-t border-border">
             <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem' }}>leco</span>
+              <span className="text-muted-foreground truncate max-w-[60px]" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem' }}>{user1}</span>
               <StarRating value={film.rating.you} />
             </div>
             <div className="w-px h-6 bg-border" />
             <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem' }}>nenoca</span>
+              <span className="text-muted-foreground truncate max-w-[60px]" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem' }}>{user2}</span>
               <StarRating value={film.rating.partner} />
             </div>
           </div>
@@ -144,7 +143,7 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
   const [user2, setUser2] = useState(defaultUser2)
   const [isLoading, setIsLoading] = useState(false)
   const [hasResults, setHasResults] = useState(false)
-  const [statusMessage, setStatusMessage] = useState('Cruzando os nossos gostos.....')
+  const [statusMessage, setStatusMessage] = useState('Cruzando os gostos de vocês...')
   
   const [watchedTogether, setWatchedTogether] = useState<CoupleMovie[]>([])
   const [coupleRecs, setCoupleRecs] = useState<CoupleRec[]>([])
@@ -183,7 +182,7 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
           return pollStatus()
         }
 
-        setStatusMessage('Gerando as recomendações perfeitas para noses.....')
+        setStatusMessage('Gerando as recomendações perfeitas para o casal...')
         const recRes = await fetch(`${API_BASE}/recommendations/couple?user1=${encodeURIComponent(user1)}&user2=${encodeURIComponent(user2)}`)
         
         if (!recRes.ok) throw new Error('Falha ao obter indicações.')
@@ -223,7 +222,7 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
                 <span style={{ fontStyle: 'italic', color: '#c97d8a' }}>adorar assistir juntos.</span>
               </h1>
               <p className="text-secondary-foreground text-base mb-10 max-w-lg leading-relaxed">
-                Combinamos os dois perfis do Letterboxd para encontrar filmes que encaixam no nosso gosto e registramos o que assistimos juntos.
+                Combinamos os dois perfis do Letterboxd para encontrar filmes que encaixam no gosto e registrar o que já assistiram juntos.
               </p>
             </>
           )}
@@ -337,7 +336,7 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
                   </span>
                 </div>
                 <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
-                  {watchedTogether.map((f) => <WatchedCard key={f.id} film={f} />)}
+                  {watchedTogether.map((f) => <WatchedCard key={f.id} film={f} user1={user1} user2={user2} />)}
                 </div>
               </div>
             </div>
