@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -16,13 +17,17 @@ class FeedbackRequest(BaseModel):
     username: str
     tmdb_id: int
     title: str
-    action: str  # Pode ser 'seen', 'liked', 'disliked'
+    action: str
 
 class EnrichRequest(BaseModel):
     title: str
     source_link: Optional[str] = None
 
+class SyncRequest(BaseModel):
+    username: str
+
 app = FastAPI(title="Recomendador Letterboxd - MVP")
+
 app.mount('/static', StaticFiles(directory=os.path.join(os.path.dirname(__file__), '..', 'web')), name='static')
 
 frontend_dir = os.path.join(os.path.dirname(__file__), '..', 'dist')
@@ -33,17 +38,11 @@ if os.path.isdir(frontend_dir):
 async def root():
     return RedirectResponse(url='/app/', status_code=307)
 
-
-class SyncRequest(BaseModel):
-    username: str
-
 @app.post('/sync-start')
 async def sync_start(req: SyncRequest):
     job = create_sync_job(req.username)
-    # O await garante que o Vercel não corte o processo
     await fetch_rss_entries(req.username, job_id=job.id)
     return {"status": "sync_completed", "username": req.username, "job_id": job.id}
-
 
 @app.get('/sync-status/{username}')
 async def sync_status(username: str):
@@ -51,16 +50,18 @@ async def sync_status(username: str):
     try:
         job = get_latest_sync_job(username)
         user = db.query(User).filter(User.username == username).one_or_none()
+        
         film_count = 0
         created_at = None
+        
         if user:
             film_count = db.query(UserFilm).filter(UserFilm.user_id == user.id).count()
             if hasattr(user, 'created_at') and user.created_at is not None:
                 created_at = user.created_at.isoformat()
-
+        
         if not job:
             return {"username": username, "status": "not_started", "film_count": film_count, "job_id": None, "created_at": created_at}
-
+        
         return {
             "username": username,
             "status": job.status,
@@ -72,13 +73,12 @@ async def sync_status(username: str):
     finally:
         db.close()
 
-
 @app.get('/recommendations/{username}')
 async def recommendations(
     username: str,
     limit: int = 10,
-    page: int = 1, # Novo parâmetro de paginação
-    reference_movie: str | None = None, # Novo parâmetro de filme base
+    page: int = 1,
+    reference_movie: str | None = None,
     rerank: bool = False,
     genre: str | None = None,
     min_year: int | None = None,
@@ -97,14 +97,14 @@ async def recommendations(
     )
     return {"username": username, "page": page, "recommendations": recs}
 
-
 @app.post('/enrich')
 async def enrich(req: EnrichRequest):
     db = SessionLocal()
     try:
         film = await enrich_and_save_film(db, req.title, req.source_link)
         return {"status": "ok", "film": {"id": film.id, "title": film.title, "tmdb_id": film.tmdb_id}}
-
+    finally:
+        db.close()
 
 @app.post('/feedback')
 async def submit_feedback(req: FeedbackRequest):
@@ -121,14 +121,15 @@ async def submit_feedback(req: FeedbackRequest):
             uf = UserFilm(user_id=user.id, film_id=film.id)
             db.add(uf)
             
+        now = datetime.now()
         if req.action == 'seen':
-            uf.watched_at = text('now()')
+            uf.watched_at = now
         elif req.action == 'liked':
             uf.favorite = True
-            uf.watched_at = text('now()')
+            uf.watched_at = now
         elif req.action == 'disliked':
             uf.disliked = True
-            uf.watched_at = text('now()')
+            uf.watched_at = now
             
         db.commit()
         return {"status": "success"}
