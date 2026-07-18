@@ -143,7 +143,7 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
   const [user2, setUser2] = useState(defaultUser2)
   const [isLoading, setIsLoading] = useState(false)
   const [hasResults, setHasResults] = useState(false)
-  const [statusMessage, setStatusMessage] = useState('Cruzando os gostos de vocês...')
+  const [statusMessage, setStatusMessage] = useState('Cruzando os nossos gostos....')
   
   const [watchedTogether, setWatchedTogether] = useState<CoupleMovie[]>([])
   const [coupleRecs, setCoupleRecs] = useState<CoupleRec[]>([])
@@ -182,7 +182,7 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
           return pollStatus()
         }
 
-        setStatusMessage('Gerando as recomendações perfeitas para o casal...')
+        setStatusMessage('Gerando as recomendações perfeitas para noses.....')
         const recRes = await fetch(`${API_BASE}/recommendations/couple?user1=${encodeURIComponent(user1)}&user2=${encodeURIComponent(user2)}`)
         
         if (!recRes.ok) throw new Error('Falha ao obter indicações.')
@@ -222,7 +222,7 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
                 <span style={{ fontStyle: 'italic', color: '#c97d8a' }}>adorar assistir juntos.</span>
               </h1>
               <p className="text-secondary-foreground text-base mb-10 max-w-lg leading-relaxed">
-                Combinamos os dois perfis do Letterboxd para encontrar filmes que encaixam no gosto e registrar o que já assistiram juntos.
+                Combinamos os nossos dois perfis do Letterboxd para encontrarmos filmes que encaixam no nosso gosto e registrar o que já assistimos juntos.
               </p>
             </>
           )}
