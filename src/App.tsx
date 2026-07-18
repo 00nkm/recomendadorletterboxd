@@ -6,9 +6,7 @@ import CouplePage from './pages/CouplePage'
 import type { Filters } from './components/FilterBar'
 import { mockMovies } from './data/mockMovies'
 
-type Page = 'home' | 'couple'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+type Page = 'home' | 'us'
 
 interface RecommendationItem {
   tmdb_id: number
@@ -34,8 +32,6 @@ interface RecommendationCard {
   posterUrl: string | null
   posterColor: string
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const deriveMood = (genres: string[]) => {
   if (genres.some((g) => g.toLowerCase() === 'horror')) return 'Dark'
@@ -89,17 +85,10 @@ const toMockCard = (item: (typeof mockMovies)[number], index: number): Recommend
   posterColor: item.posterColor,
 })
 
-const API_BASE = (
-  import.meta.env.VITE_API_BASE_URL ||
-  (typeof window !== 'undefined' ? window.location.origin : '')
-).replace(/\/$/, '')
-
-// ─── App ──────────────────────────────────────────────────────────────────────
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '')
 
 export default function App() {
   const [page, setPage] = useState<Page>('home')
-
-  // Home page state
   const [username, setUsername] = useState<string | null>(null)
   const [referenceMovie, setReferenceMovie] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
@@ -118,7 +107,7 @@ export default function App() {
     setCurrentPage(1)
     setFilters({ genre: null, mood: null, decade: null })
     setRecommendations([])
-    setStatusMessage(`Iniciando conexão para @${user}…`)
+    setStatusMessage(`Iniciando conexão para @${user}...`)
 
     try {
       const syncRes = await fetch(`${API_BASE}/sync-start`, {
@@ -133,7 +122,7 @@ export default function App() {
         const statusRes = await fetch(`${API_BASE}/sync-status/${encodeURIComponent(user)}`, { cache: 'no-store' })
         if (!statusRes.ok) throw new Error('Monitoramento de status falhou.')
         const statusData = await statusRes.json()
-        setStatusMessage(statusData.job_message || statusData.status || 'processando…')
+        setStatusMessage(statusData.job_message || statusData.status || 'processando')
 
         if (statusData.status === 'processing' || statusData.status === 'pending') {
           await new Promise((r) => window.setTimeout(r, 1800))
@@ -146,13 +135,10 @@ export default function App() {
 
         const params = new URLSearchParams({ limit: '8', only_unseen: 'true', page: '1' })
         if (refMovie) params.append('reference_movie', refMovie)
-
         const recRes = await fetch(`${API_BASE}/recommendations/${encodeURIComponent(user)}?${params}`, { cache: 'no-store' })
         if (!recRes.ok) throw new Error('Falha ao obter recomendações.')
-
         const recData = await recRes.json()
         const items = Array.isArray(recData.recommendations) ? recData.recommendations : []
-
         if (items.length === 0) {
           setStatusMessage('Nenhuma recomendação gerada para este perfil.')
           return
@@ -160,13 +146,12 @@ export default function App() {
         setRecommendations(items.map((item: RecommendationItem, i: number) => toRecommendationCard(item, i)))
         setStatusMessage(`${items.length} recomendações para @${user}.`)
       }
-
       await pollStatus()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro de comunicação.'
+      const msg = err instanceof Error ? err.message : 'Erro de comunicação'
       setError(msg)
       setRecommendations(mockMovies.slice(0, 8).map(toMockCard))
-      setStatusMessage('Modo estático — servidor temporariamente indisponível.')
+      setStatusMessage('Modo estático: servidor temporariamente indisponível.')
     } finally {
       setIsLoading(false)
     }
@@ -179,10 +164,8 @@ export default function App() {
     try {
       const params = new URLSearchParams({ limit: '8', only_unseen: 'true', page: nextPage.toString() })
       if (referenceMovie) params.append('reference_movie', referenceMovie)
-
       const res = await fetch(`${API_BASE}/recommendations/${encodeURIComponent(username)}?${params}`, { cache: 'no-store' })
       if (!res.ok) throw new Error('Falha ao carregar mais.')
-
       const data = await res.json()
       const items = Array.isArray(data.recommendations) ? data.recommendations : []
       setRecommendations((prev) => [...prev, ...items.map((item: RecommendationItem, i: number) => toRecommendationCard(item, prev.length + i))])
@@ -197,7 +180,6 @@ export default function App() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-foreground)' }}>
       <Header currentPage={page} onNavigate={setPage} />
-
       <main>
         {page === 'home' && (
           <>
@@ -206,7 +188,6 @@ export default function App() {
               isLoading={isLoading}
               hasResults={!!username}
             />
-
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-32 gap-4">
                 <div className="flex gap-1.5">
@@ -223,7 +204,6 @@ export default function App() {
                 </p>
               </div>
             )}
-
             {username && !isLoading && (
               <RecommendationsSection
                 username={username}
@@ -238,8 +218,7 @@ export default function App() {
             )}
           </>
         )}
-
-        {page === 'couple' && <CouplePage />}
+        {page === 'us' && <CouplePage />}
       </main>
     </div>
   )
