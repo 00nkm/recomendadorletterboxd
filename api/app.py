@@ -97,6 +97,12 @@ async def recommendations(
     )
     return {"username": username, "page": page, "recommendations": recs}
 
+@app.get('/recommendations/couple')
+async def couple_recommendations(user1: str, user2: str, limit: int = 6):
+    from services.recommendation.engine import recommend_for_couple
+    data = await recommend_for_couple(user1, user2, limit)
+    return data
+
 @app.post('/enrich')
 async def enrich(req: EnrichRequest):
     db = SessionLocal()
