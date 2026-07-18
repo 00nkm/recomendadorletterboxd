@@ -36,11 +36,15 @@ async def fetch_rss_entries(username: str, job_id: int | None = None) -> List[Di
             r.raise_for_status()
             root = ET.fromstring(r.text)
             for item in root.findall('.//item'):
+                # Captura todas as tags inseridas na review
+                categories = [cat.text for cat in item.findall('category') if cat.text]
+                
                 items.append({
                     'title': item.findtext('title'),
                     'link': item.findtext('link'),
                     'pubDate': item.findtext('pubDate'),
                     'description': item.findtext('description'),
+                    'tags': categories, # <-- Novo campo
                 })
     except Exception as exc:
         update_sync_job(job_id, 'processing', message='RSS indisponível. Usando fallback.')
