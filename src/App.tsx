@@ -61,7 +61,7 @@ const toRecommendationCard = (item: RecommendationItem, index: number): Recommen
     moods: [mood],
     decade: deriveDecade(item.year),
     matchScore: score,
-    matchReason: item.explanation || 'This recommendation was generated from your taste profile and diary history.',
+    matchReason: item.explanation || 'Análise formulada a partir do seu histórico cinematográfico e perfil de curadoria.',
     runtime: null,
     posterUrl: item.poster_url ?? null,
     posterColor: '#111113',
@@ -77,7 +77,7 @@ const toMockRecommendationCard = (item: (typeof mockMovies)[number], index: numb
   moods: item.moods?.length ? item.moods : [deriveMood(item.genres)],
   decade: item.decade || deriveDecade(item.year),
   matchScore: item.matchScore,
-  matchReason: item.matchReason || 'This demo recommendation is shown because the live backend is unavailable.',
+  matchReason: item.matchReason || 'Item demonstrativo fornecido devido à indisponibilidade temporária do servidor de processamento.',
   runtime: item.runtime,
   posterUrl: item.posterUrl || null,
   posterColor: item.posterColor,
@@ -92,7 +92,7 @@ export default function App() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [page, setPage] = useState(1)
   const [recommendations, setRecommendations] = useState<RecommendationCard[]>([])
-  const [statusMessage, setStatusMessage] = useState('Enter a Letterboxd username to start the sync.')
+  const [statusMessage, setStatusMessage] = useState('Insira um usuário do Letterboxd para iniciar a pesquisa.')
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<Filters>({ genre: null, mood: null, decade: null })
 
@@ -104,7 +104,7 @@ export default function App() {
     setPage(1)
     setFilters({ genre: null, mood: null, decade: null })
     setRecommendations([])
-    setStatusMessage(`Starting sync for @${user}...`)
+    setStatusMessage(`Iniciando a conexão para @${user}...`)
 
     try {
       const syncResponse = await fetch(`${API_BASE}/sync-start`, {
@@ -114,16 +114,16 @@ export default function App() {
         cache: 'no-store',
       })
       if (!syncResponse.ok) {
-        throw new Error('The sync request could not be started.')
+        throw new Error('A solicitação de sincronização falhou ao ser iniciada.')
       }
 
       const pollStatus = async () => {
         const statusResponse = await fetch(`${API_BASE}/sync-status/${encodeURIComponent(user)}`, { cache: 'no-store' })
         if (!statusResponse.ok) {
-          throw new Error('The status endpoint did not respond correctly.')
+          throw new Error('O monitoramento de status não retornou os dados de forma correta.')
         }
         const statusData = await statusResponse.json()
-        const nextMessage = statusData.job_message || statusData.status || 'processing'
+        const nextMessage = statusData.job_message || statusData.status || 'processando'
         setStatusMessage(nextMessage)
 
         if (statusData.status === 'processing' || statusData.status === 'pending') {
@@ -133,7 +133,7 @@ export default function App() {
 
         if (statusData.status === 'failed') {
           setRecommendations([])
-          setStatusMessage(statusData.job_message || 'The sync could not be completed, but the app will keep trying to show the best available results.')
+          setStatusMessage(statusData.job_message || 'A sincronização encontrou problemas técnicos. O sistema tentará mostrar os filmes disponíveis na base.')
           return
         }
 
@@ -142,7 +142,7 @@ export default function App() {
 
         const recommendationsResponse = await fetch(`${API_BASE}/recommendations/${encodeURIComponent(user)}?${queryParams.toString()}`, { cache: 'no-store' })
         if (!recommendationsResponse.ok) {
-          throw new Error('The recommendations endpoint failed to return results.')
+          throw new Error('A inteligência artificial não obteve um retorno completo para essas indicações.')
         }
 
         const recommendationsData = await recommendationsResponse.json()
@@ -150,21 +150,21 @@ export default function App() {
 
         if (items.length === 0) {
           setRecommendations([])
-          setStatusMessage('No recommendations were generated yet for this profile.')
+          setStatusMessage('Nenhum catálogo de recomendação gerado para este formato.')
           return
         }
 
         setRecommendations(items.map((item: RecommendationItem, index: number) => toRecommendationCard(item, index)))
-        setStatusMessage(`Loaded ${items.length} recommendations for @${user}.`)
+        setStatusMessage(`Entrega de ${items.length} obras para @${user}.`)
       }
 
       await pollStatus()
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to load recommendations right now.'
+      const message = err instanceof Error ? err.message : 'Dificuldades na comunicação da nuvem.'
       setError(message)
       const demoItems = mockMovies.slice(0, 8)
       setRecommendations(demoItems.map((movie, index) => toMockRecommendationCard(movie, index)))
-      setStatusMessage('The live recommendation backend is unavailable right now, so the app is showing demo recommendations instead.')
+      setStatusMessage('O servidor de busca caiu para o modo estático provisoriamente.')
     } finally {
       setIsLoading(false)
     }
@@ -180,7 +180,7 @@ export default function App() {
       if (referenceMovie) queryParams.append('reference_movie', referenceMovie)
 
       const recommendationsResponse = await fetch(`${API_BASE}/recommendations/${encodeURIComponent(username)}?${queryParams.toString()}`, { cache: 'no-store' })
-      if (!recommendationsResponse.ok) throw new Error('Failed to load more recommendations.')
+      if (!recommendationsResponse.ok) throw new Error('Falha ao processar os itens subsequentes da lista.')
 
       const recommendationsData = await recommendationsResponse.json()
       const items = Array.isArray(recommendationsData.recommendations) ? recommendationsData.recommendations : []
@@ -237,7 +237,7 @@ export default function App() {
               className="text-muted-foreground text-xs"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              reading your taste profile
+              vasculhando o seu arquivo
             </p>
           </div>
         )}
