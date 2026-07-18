@@ -17,17 +17,16 @@ export default function Header() {
           className="text-muted-foreground text-xs tracking-widest uppercase"
           style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.12em' }}
         >
-          / ai picks
+          / curadoria de ia
         </span>
       </div>
-
       <div className="flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
         <span
           className="text-muted-foreground text-xs"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          powered by letterboxd
+          dados via letterboxd
         </span>
       </div>
     </header>
