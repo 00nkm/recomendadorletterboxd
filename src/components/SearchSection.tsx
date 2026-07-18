@@ -16,7 +16,11 @@ export default function SearchSection({ onSearch, isLoading, hasResults }: Searc
   }
 
   return (
-    <section className={`transition-all duration-700 ${hasResults ? 'py-10 border-b border-border' : 'py-24 md:py-36'}`}>
+    <section
+      className={`transition-all duration-700 ${
+        hasResults ? 'py-10 border-b border-border' : 'py-24 md:py-36'
+      }`}
+    >
       <div className="max-w-2xl mx-auto px-6">
         {!hasResults && (
           <>
@@ -45,7 +49,9 @@ export default function SearchSection({ onSearch, isLoading, hasResults }: Searc
             </p>
           </>
         )}
+
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          {/* Username input */}
           <div className="flex gap-3 flex-col sm:flex-row">
             <div className="flex-1 relative">
               <span
@@ -93,23 +99,60 @@ export default function SearchSection({ onSearch, isLoading, hasResults }: Searc
               )}
             </button>
           </div>
-          <div className="flex-1">
-             <input
-                type="text"
-                value={referenceMovie}
-                onChange={(e) => setReferenceMovie(e.target.value)}
-                placeholder="Inspirado em qual filme? (Opcional)"
-                className="w-full bg-card border border-border text-foreground placeholder-muted-foreground
-                           rounded-sm outline-none transition-all duration-200 text-sm
-                           focus:border-primary focus:ring-1 focus:ring-ring"
-                style={{
-                  padding: '0.75rem 1rem',
-                  fontFamily: 'var(--font-sans)',
-                }}
-                disabled={isLoading}
-              />
+
+          {/* Reference movie input — styled as a special "inspiration" field */}
+          <div
+            className="flex items-center gap-0 rounded-sm border overflow-hidden transition-all duration-200 focus-within:border-primary/60"
+            style={{
+              borderColor: 'var(--color-border)',
+              backgroundColor: 'var(--color-card)',
+            }}
+          >
+            {/* Icon prefix tab */}
+            <div
+              className="flex items-center gap-2 px-3 py-3 border-r shrink-0"
+              style={{ borderColor: 'var(--color-border)' }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                style={{ color: 'var(--color-primary)', opacity: 0.8 }}
+              >
+                {/* Clapperboard icon */}
+                <path d="M4 11v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8H4z" />
+                <path d="M4 11V7l2-2h12l2 2v4H4z" />
+                <line x1="4" y1="11" x2="20" y2="11" />
+                <line x1="9" y1="7" x2="7" y2="11" />
+                <line x1="14" y1="7" x2="12" y2="11" />
+                <line x1="19" y1="7" x2="17" y2="11" />
+              </svg>
+              <span
+                className="text-xs whitespace-nowrap"
+                style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-primary)', opacity: 0.8 }}
+              >
+                inspirado em
+              </span>
+            </div>
+            <input
+              type="text"
+              value={referenceMovie}
+              onChange={(e) => setReferenceMovie(e.target.value)}
+              placeholder="Título de um filme como referência (opcional)"
+              className="flex-1 bg-transparent text-foreground placeholder-muted-foreground
+                         outline-none text-sm"
+              style={{
+                padding: '0.75rem 1rem',
+                fontFamily: 'var(--font-sans)',
+              }}
+              disabled={isLoading}
+            />
           </div>
         </form>
+
         {!hasResults && (
           <p className="text-muted-foreground text-xs mt-4 leading-relaxed">
             Lemos apenas os seus dados públicos do Letterboxd. Nenhum login é necessário.
