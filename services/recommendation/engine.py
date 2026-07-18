@@ -136,9 +136,9 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
             "The Ugly Stepsister",
             "Evil Dead Burn",
             "The Tale of The Princess Kaguya"
-            "The Sadness (2021)"
-            "The Farm (2018)"
-            "The Flesh Itself (2025)"
+            "The Sadness"
+            "The Farm"
+            "The Flesh Itself"
         ]
         
         watched_together = []
