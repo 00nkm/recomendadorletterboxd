@@ -66,7 +66,7 @@ export default function FilterBar({ filters, onChange, count }: FilterBarProps) 
               className="text-foreground font-medium text-sm"
               style={{ fontFamily: 'var(--font-sans)' }}
             >
-              {count} {count === 1 ? 'recommendation' : 'recommendations'}
+              {count} {count === 1 ? 'recomendação' : 'recomendações'}
             </span>
             {hasActiveFilters && (
               <button
@@ -74,7 +74,7 @@ export default function FilterBar({ filters, onChange, count }: FilterBarProps) 
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                clear filters
+                limpar filtros
               </button>
             )}
           </div>
@@ -82,21 +82,21 @@ export default function FilterBar({ filters, onChange, count }: FilterBarProps) 
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
           <FilterGroup
-            label="Genre"
+            label="Gênero"
             options={GENRES}
             active={filters.genre}
             onSelect={(val) => onChange({ ...filters, genre: val })}
           />
           <div className="hidden md:block w-px h-4 bg-border shrink-0" />
           <FilterGroup
-            label="Mood"
+            label="Clima"
             options={MOODS}
             active={filters.mood}
             onSelect={(val) => onChange({ ...filters, mood: val })}
           />
           <div className="hidden md:block w-px h-4 bg-border shrink-0" />
           <FilterGroup
-            label="Decade"
+            label="Década"
             options={DECADES}
             active={filters.decade}
             onSelect={(val) => onChange({ ...filters, decade: val })}
