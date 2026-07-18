@@ -5,6 +5,7 @@ import MovieCard from './MovieCard'
 
 interface RecommendationCard {
   id: string
+  tmdb_id: number
   title: string
   year: number | null
   genres: string[]
@@ -24,6 +25,8 @@ interface RecommendationsSectionProps {
   recommendations: RecommendationCard[]
   statusMessage: string
   error: string | null
+  onLoadMore: () => void
+  isLoadingMore: boolean
 }
 
 export default function RecommendationsSection({
@@ -33,6 +36,8 @@ export default function RecommendationsSection({
   recommendations,
   statusMessage,
   error,
+  onLoadMore,
+  isLoadingMore,
 }: RecommendationsSectionProps) {
   const filtered = useMemo(() => {
     return recommendations.filter((movie) => {
@@ -59,7 +64,7 @@ export default function RecommendationsSection({
           >
             @{username}
           </span>
-          <span className="text-border text-xs">·</span>
+          <span className="text-border text-xs">/</span>
           <span
             className="text-muted-foreground text-xs"
             style={{ fontFamily: 'var(--font-mono)' }}
@@ -111,11 +116,26 @@ export default function RecommendationsSection({
             }}
           >
             {filtered.map((movie) => (
-              <MovieCard key={movie.id} movie={movie} />
+              <MovieCard key={movie.id} movie={movie} username={username} />
             ))}
           </div>
         )}
       </div>
+
+      {filtered.length > 0 && recommendations.length > 0 && (
+        <div className="px-6 pb-6 max-w-7xl mx-auto flex justify-center">
+          <button
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+            className="px-6 py-3 border border-border text-foreground text-sm font-medium rounded-sm
+                       transition-all duration-200 hover:bg-secondary active:scale-[0.98]
+                       disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ fontFamily: 'var(--font-sans)' }}
+          >
+            {isLoadingMore ? 'Loading more films...' : 'Load more recommendations'}
+          </button>
+        </div>
+      )}
 
       <div className="px-6 pb-10 max-w-7xl mx-auto">
         <p
