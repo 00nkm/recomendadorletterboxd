@@ -32,8 +32,6 @@ async def recommend_for_user(
         film_lookup = {film.id: film for film in db.query(Film).all()}
         
         favoritos = [film_lookup[uf.film_id].title for uf in user_films if uf.favorite and uf.film_id in film_lookup]
-        
-        # O sistema agora isola os filmes rejeitados para alimentar o filtro negativo da IA
         disliked = [film_lookup[uf.film_id].title for uf in user_films if getattr(uf, 'disliked', False) and uf.film_id in film_lookup]
         assistidos = [film_lookup[uf.film_id].title for uf in user_films if uf.film_id in film_lookup and not getattr(uf, 'disliked', False)][:30]
         
@@ -48,13 +46,13 @@ async def recommend_for_user(
         if min_year and max_year:
             filtros += f"Somente títulos lançados entre {min_year} e {max_year}. "
         if disliked:
-            filtros += f"NÃO RECOMENDE os seguintes filmes, o usuário marcou que não gostou deles: {', '.join(disliked[:10])}. "
+            filtros += f"Não recomende os seguintes filmes, o usuário marcou que não gostou deles: {', '.join(disliked[:10])}. "
             
         if reference_movie:
-            filtros += f"ATENÇÃO MÁXIMA: O usuário pediu filmes especificamente parecidos com '{reference_movie}'. Use esse filme como âncora principal da curadoria. "
+            filtros += f"Atenção máxima: O usuário pediu filmes especificamente parecidos com '{reference_movie}'. Use esse filme como âncora principal da curadoria. "
 
         if page > 1:
-            filtros += f"Esta é a página {page} de busca. Pule os resultados mais óbvios e comerciais. Traga joias escondidas (hidden gems) que se encaixem perfeitamente no perfil. "
+            filtros += f"Esta é a página {page} de busca. Pule os resultados comerciais. Traga joias escondidas que se encaixem perfeitamente no perfil. "
             
         prompt = (
             f"Você atua como um curador cinematográfico de alto nível. Analise as informações: {perfil} "
@@ -73,7 +71,6 @@ async def recommend_for_user(
             "Content-Type": "application/json"
         }
         
-        # A matemática da temperatura evita repetições em consultas sucessivas
         temperatura_calculada = 0.7 if page == 1 else min(0.95, 0.7 + (page * 0.05))
         
         payload = {
@@ -85,10 +82,6 @@ async def recommend_for_user(
         
         async with httpx.AsyncClient(timeout=30.0) as client:
             resposta = await client.post(url, headers=headers, json=payload)
-            
-            if resposta.status_code != 200:
-                print(f"Erro na API do Groq: {resposta.text}")
-                
             resposta.raise_for_status()
             dados_groq = resposta.json()
             
@@ -98,7 +91,6 @@ async def recommend_for_user(
                 texto_limpo = match.group(0) if match else texto_json
                 data = json.loads(texto_limpo)
             except Exception as e:
-                print(f"Falha ao processar o JSON: {e} | Retorno original: {dados_groq}")
                 data = {"recommendations": []}
         
         rec_list = data.get('recommendations', [])
@@ -138,32 +130,33 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
         
         film_lookup = {film.id: film for film in db.query(Film).all()}
         
-        u1_film_ids = {uf.film_id for uf in u1_films}
-        u2_film_ids = {uf.film_id for uf in u2_films}
-        
-        nenoca_ids_1 = {uf.film_id for uf in u1_films if getattr(uf, 'tags', None) and any('nenoca' in t.lower() for t in uf.tags)}
-        nenoca_ids_2 = {uf.film_id for uf in u2_films if getattr(uf, 'tags', None) and any('nenoca' in t.lower() for t in uf.tags)}
-        
-        common_film_ids = u1_film_ids.intersection(u2_film_ids).union(nenoca_ids_1).union(nenoca_ids_2)
+        # Insira os nomes em inglês das obras que vocês assistiram juntos
+        FILMES_NENOCA = [
+            "La La Land",
+            "Before Sunrise",
+            "In the Mood for Love",
+            "Eternal Sunshine of the Spotless Mind"
+        ]
         
         watched_together = []
-        for fid in list(common_film_ids)[:12]:
-            if fid in film_lookup:
-                f = film_lookup[fid]
-                r1 = next((uf.rating for uf in u1_films if uf.film_id == fid), 0) or 0
-                r2 = next((uf.rating for uf in u2_films if uf.film_id == fid), 0) or 0
-                watched_together.append({
-                    "id": f.id,
-                    "tmdb_id": f.tmdb_id,
-                    "title": f.title,
-                    "year": f.year,
-                    "director": "",
-                    "posterUrl": _build_poster_url(f),
-                    "posterColor": "#1a1228",
-                    "rating": {"you": r1, "partner": r2}
-                })
-                
-        # Plano B: extrai os assistidos recentes caso os usuários não utilizem a função "Favoritos" no perfil
+        for titulo in FILMES_NENOCA:
+            f_obj = await enrich_and_save_film(db, titulo)
+            
+            # Coleta a nota de cada perfil se o filme já estiver no diário individual
+            r1 = next((uf.rating for uf in u1_films if uf.film_id == f_obj.id), 0) or 0
+            r2 = next((uf.rating for uf in u2_films if uf.film_id == f_obj.id), 0) or 0
+            
+            watched_together.append({
+                "id": f_obj.id,
+                "tmdb_id": f_obj.tmdb_id,
+                "title": f_obj.title,
+                "year": f_obj.year,
+                "director": "",
+                "posterUrl": _build_poster_url(f_obj),
+                "posterColor": "#1a1228",
+                "rating": {"you": r1, "partner": r2}
+            })
+            
         fav1 = [film_lookup[uf.film_id].title for uf in u1_films if getattr(uf, 'favorite', False) and uf.film_id in film_lookup]
         if not fav1:
             fav1 = [film_lookup[uf.film_id].title for uf in u1_films if uf.film_id in film_lookup][:8]
@@ -176,10 +169,8 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
         
         perfil = f"Parceiro 1 ({user1_username}) assiste/gosta de: {', '.join(fav1[:10])}. Parceiro 2 ({user2_username}) assiste/gosta de: {', '.join(fav2[:10])}. "
         
-        # Envia as obras marcadas com a tag diretamente para o LLM aprender o padrão de vocês
-        juntos = [f["title"] for f in watched_together]
-        if juntos:
-            perfil += f"Obras marcantes que eles já assistiram juntos: {', '.join(juntos[:8])}. "
+        if FILMES_NENOCA:
+            perfil += f"Obras marcantes que eles já assistiram juntos: {', '.join(FILMES_NENOCA[:8])}. "
         
         filtros = ""
         if disliked:
