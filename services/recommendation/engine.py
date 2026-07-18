@@ -135,9 +135,9 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
             "The Drama",
             "The Ugly Stepsister",
             "Evil Dead Burn",
-            "The Tale of The Princess Kaguya"
-            "The Sadness"
-            "The Farm"
+            "The Tale of The Princess Kaguya",
+            "The Sadness",
+            "The Farm",
             "The Flesh Itself"
         ]
         
