@@ -11,13 +11,13 @@ export default function Header() {
           className="text-foreground tracking-tight leading-none"
           style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem' }}
         >
-          reelmate
+          leco
         </span>
         <span
           className="text-muted-foreground text-xs tracking-widest uppercase"
           style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.12em' }}
         >
-          / curadoria de ia
+          / curadoria de filmes
         </span>
       </div>
       <div className="flex items-center gap-2">
