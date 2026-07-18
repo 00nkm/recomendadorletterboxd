@@ -1,4 +1,4 @@
-type Page = 'home' | 'couple'
+type Page = 'home' | 'us'
 
 interface HeaderProps {
   currentPage: Page
@@ -22,7 +22,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
           className="text-foreground tracking-tight leading-none"
           style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem' }}
         >
-          reelmate
+          leco
         </span>
       </button>
 
@@ -40,16 +40,16 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
         </NavButton>
 
         <NavButton
-          active={currentPage === 'couple'}
-          onClick={() => onNavigate('couple')}
+          active={currentPage === 'us'}
+          onClick={() => onNavigate('us')}
           rose
         >
           <svg
             width="13"
             height="13"
             viewBox="0 0 24 24"
-            fill={currentPage === 'couple' ? '#c97d8a' : 'none'}
-            stroke={currentPage === 'couple' ? '#c97d8a' : 'currentColor'}
+            fill={currentPage === 'us' ? '#c97d8a' : 'none'}
+            stroke={currentPage === 'us' ? '#c97d8a' : 'currentColor'}
             strokeWidth="2"
           >
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
