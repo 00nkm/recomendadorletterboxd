@@ -46,8 +46,9 @@ class UserFilm(Base):
     rating = Column(Integer)
     in_watchlist = Column(Boolean, default=False)
     favorite = Column(Boolean, default=False)
-    disliked = Column(Boolean, default=False) # Nova coluna adicionada
+    disliked = Column(Boolean, default=False)
     review = Column(Text)
+    tags = Column(ARRAY(String)) # <-- Nova coluna
 
     user = relationship('User')
     film = relationship('Film')
