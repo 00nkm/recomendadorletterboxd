@@ -101,7 +101,13 @@ async def recommend_for_user(
         # Encontra a interseção dos filmes assistidos
         u1_film_ids = {uf.film_id for uf in u1_films}
         u2_film_ids = {uf.film_id for uf in u2_films}
-        common_film_ids = u1_film_ids.intersection(u2_film_ids)
+        
+        # Isola os filmes que possuem a tag específica nos diários
+        nenoca_ids_1 = {uf.film_id for uf in u1_films if uf.tags and any('nenoca' in t.lower() for t in uf.tags)}
+        nenoca_ids_2 = {uf.film_id for uf in u2_films if uf.tags and any('nenoca' in t.lower() for t in uf.tags)}
+        
+        # Une as interseções: Filmes marcados com a tag OU presentes nos dois diários
+        common_film_ids = u1_film_ids.intersection(u2_film_ids).union(nenoca_ids_1).union(nenoca_ids_2)
         
         watched_together = []
         for fid in list(common_film_ids)[:12]:
