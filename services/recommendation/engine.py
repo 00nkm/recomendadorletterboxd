@@ -145,7 +145,6 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
         for titulo in FILMES_NENOCA:
             f_obj = await enrich_and_save_film(db, titulo)
             
-            # Coleta a nota de cada perfil se o filme já estiver no diário individual
             r1 = next((uf.rating for uf in u1_films if uf.film_id == f_obj.id), 0) or 0
             r2 = next((uf.rating for uf in u2_films if uf.film_id == f_obj.id), 0) or 0
             
@@ -162,18 +161,19 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
             
         fav1 = [film_lookup[uf.film_id].title for uf in u1_films if getattr(uf, 'favorite', False) and uf.film_id in film_lookup]
         if not fav1:
-            fav1 = [film_lookup[uf.film_id].title for uf in u1_films if uf.film_id in film_lookup][:8]
+            fav1 = [film_lookup[uf.film_id].title for uf in u1_films if uf.film_id in film_lookup][:5]
             
         fav2 = [film_lookup[uf.film_id].title for uf in u2_films if getattr(uf, 'favorite', False) and uf.film_id in film_lookup]
         if not fav2:
-            fav2 = [film_lookup[uf.film_id].title for uf in u2_films if uf.film_id in film_lookup][:8]
+            fav2 = [film_lookup[uf.film_id].title for uf in u2_films if uf.film_id in film_lookup][:5]
             
         disliked = [film_lookup[uf.film_id].title for uf in u1_films + u2_films if getattr(uf, 'disliked', False) and uf.film_id in film_lookup]
         
-        perfil = f"Parceiro 1 ({user1_username}) assiste/gosta de: {', '.join(fav1[:10])}. Parceiro 2 ({user2_username}) assiste/gosta de: {', '.join(fav2[:10])}. "
-        
+        perfil = ""
         if FILMES_NENOCA:
-            perfil += f"Obras marcantes que eles já assistiram juntos: {', '.join(FILMES_NENOCA[:8])}. "
+            perfil += f"FOCO PRINCIPAL - Filmes que eles amam assistir juntos: {', '.join(FILMES_NENOCA)}. "
+            
+        perfil += f"Contexto Secundário - Parceiro 1 gosta de: {', '.join(fav1[:5])}. Parceiro 2 gosta de: {', '.join(fav2[:5])}. "
         
         filtros = ""
         if disliked:
@@ -182,10 +182,10 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
         prompt = (
             f"Você atua como um curador cinematográfico focado em casais. Analise os perfis: {perfil} "
             f"{filtros}"
-            "Identifique padrões subjacentes e cruze os gostos de forma inteligente. "
-            f"Gere {limit} indicações para um encontro excelente, priorizando tramas envolventes. Fuja das recomendações genéricas. "
+            "Atenção máxima: Suas recomendações devem ser DIRETAMENTE baseadas e inspiradas na lista de 'Filmes que eles amam assistir juntos'. Use os gostos individuais apenas para refinar a busca, garantindo que nenhum dos dois vai odiar a sugestão. "
+            f"Gere {limit} indicações excelentes para o próximo encontro do casal. Evite resultados muito óbvios. "
             "Responda estritamente com um JSON nesta estrutura: "
-            "{\"recommendations\": [{\"title\": \"Nome Original em Inglês\", \"year\": 2000, \"match_score\": 95, \"explanation\": \"Justifique brevemente como o filme atende aos dois gostos.\"}]}"
+            "{\"recommendations\": [{\"title\": \"Nome Original em Inglês\", \"year\": 2000, \"match_score\": 95, \"explanation\": \"Explique como a estética e a narrativa deste filme dialogam com a lista de obras conjuntas deles.\"}]}"
         )
         
         api_key = os.getenv('GROQ_API_KEY', '').strip()
