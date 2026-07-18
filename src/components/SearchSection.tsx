@@ -24,7 +24,7 @@ export default function SearchSection({ onSearch, isLoading, hasResults }: Searc
               className="text-muted-foreground text-xs tracking-widest uppercase mb-6"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              film recommendations
+              recomendações de filmes
             </p>
             <h1
               className="text-foreground mb-3 leading-tight"
@@ -34,14 +34,14 @@ export default function SearchSection({ onSearch, isLoading, hasResults }: Searc
                 fontWeight: 700,
               }}
             >
-              Your next favourite film
+              O seu próximo filme favorito
               <br />
               <span style={{ fontStyle: 'italic', color: 'var(--color-primary)' }}>
-                is already in your diary.
+                já está no seu diário.
               </span>
             </h1>
             <p className="text-secondary-foreground text-base mb-10 max-w-lg leading-relaxed">
-              We analyze your Letterboxd taste profile — what you've loved, skipped, and obsessed over — and surface films built for exactly how you watch.
+              Analisamos o seu perfil de gosto no Letterboxd — o que você amou, descartou e se obcecou — para encontrar filmes alinhados à sua curadoria pessoal.
             </p>
           </>
         )}
@@ -58,7 +58,7 @@ export default function SearchSection({ onSearch, isLoading, hasResults }: Searc
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="yourusername"
+                placeholder="seunomedeusuario"
                 className="w-full bg-card border border-border text-foreground placeholder-muted-foreground
                            rounded-sm outline-none transition-all duration-200 text-sm
                            focus:border-primary focus:ring-1 focus:ring-ring"
@@ -86,10 +86,10 @@ export default function SearchSection({ onSearch, isLoading, hasResults }: Searc
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
-                  Analyzing
+                  Analisando
                 </span>
               ) : (
-                'Get Recommendations'
+                'Gerar Recomendações'
               )}
             </button>
           </div>
@@ -112,7 +112,7 @@ export default function SearchSection({ onSearch, isLoading, hasResults }: Searc
         </form>
         {!hasResults && (
           <p className="text-muted-foreground text-xs mt-4 leading-relaxed">
-            We only read your public Letterboxd data. No account required.
+            Lemos apenas os seus dados públicos do Letterboxd. Nenhum login é necessário.
           </p>
         )}
       </div>
