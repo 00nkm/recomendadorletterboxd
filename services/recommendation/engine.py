@@ -82,8 +82,48 @@ async def recommend_for_user(
             "response_format": {"type": "json_object"},
             "temperature": temperatura_calculada
         }
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resposta = await client.post(url, headers=headers, json=payload)
+            
+            if resposta.status_code != 200:
+                print(f"Erro na API do Groq: {resposta.text}")
+                
+            resposta.raise_for_status()
+            dados_groq = resposta.json()
+            
+            try:
+                texto_json = dados_groq["choices"][0]["message"]["content"]
+                match = re.search(r'\{.*\}', texto_json, re.DOTALL)
+                texto_limpo = match.group(0) if match else texto_json
+                data = json.loads(texto_limpo)
+            except Exception as e:
+                print(f"Falha ao processar o JSON: {e} | Retorno original: {dados_groq}")
+                data = {"recommendations": []}
+        
+        rec_list = data.get('recommendations', [])
+        
+        results = []
+        for item in rec_list:
+            film_obj = await enrich_and_save_film(db, item['title'])
+            
+            results.append({
+                'film_id': film_obj.id,
+                'tmdb_id': film_obj.tmdb_id,
+                'title': film_obj.title,
+                'year': film_obj.year,
+                'genres': film_obj.genres if film_obj.genres else [],
+                'language': film_obj.original_language,
+                'poster_url': _build_poster_url(film_obj),
+                'match_score': item.get('match_score', 90),
+                'explanation': item.get('explanation', '')
+            })
+            
+        return results
+    finally:
+        db.close()
 
-        async def recommend_for_couple(user1_username: str, user2_username: str, limit: int = 6) -> Dict:
+async def recommend_for_couple(user1_username: str, user2_username: str, limit: int = 6) -> Dict:
     db = SessionLocal()
     try:
         # Busca os dois perfis no banco de dados
@@ -102,9 +142,9 @@ async def recommend_for_user(
         u1_film_ids = {uf.film_id for uf in u1_films}
         u2_film_ids = {uf.film_id for uf in u2_films}
         
-        # Isola os filmes que possuem a tag específica nos diários
-        nenoca_ids_1 = {uf.film_id for uf in u1_films if uf.tags and any('nenoca' in t.lower() for t in uf.tags)}
-        nenoca_ids_2 = {uf.film_id for uf in u2_films if uf.tags and any('nenoca' in t.lower() for t in uf.tags)}
+        # Isola os filmes que possuem a tag "nenoca" nos diários
+        nenoca_ids_1 = {uf.film_id for uf in u1_films if getattr(uf, 'tags', None) and any('nenoca' in t.lower() for t in uf.tags)}
+        nenoca_ids_2 = {uf.film_id for uf in u2_films if getattr(uf, 'tags', None) and any('nenoca' in t.lower() for t in uf.tags)}
         
         # Une as interseções: Filmes marcados com a tag OU presentes nos dois diários
         common_film_ids = u1_film_ids.intersection(u2_film_ids).union(nenoca_ids_1).union(nenoca_ids_2)
@@ -191,44 +231,5 @@ async def recommend_for_user(
             })
             
         return {"watched_together": watched_together, "recommendations": results}
-
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resposta = await client.post(url, headers=headers, json=payload)
-            
-            if resposta.status_code != 200:
-                print(f"Erro na API do Groq: {resposta.text}")
-                
-            resposta.raise_for_status()
-            dados_groq = resposta.json()
-            
-            try:
-                texto_json = dados_groq["choices"][0]["message"]["content"]
-                match = re.search(r'\{.*\}', texto_json, re.DOTALL)
-                texto_limpo = match.group(0) if match else texto_json
-                data = json.loads(texto_limpo)
-            except Exception as e:
-                print(f"Falha ao processar o JSON: {e} | Retorno original: {dados_groq}")
-                data = {"recommendations": []}
-        
-        rec_list = data.get('recommendations', [])
-        
-        results = []
-        for item in rec_list:
-            film_obj = await enrich_and_save_film(db, item['title'])
-            
-            results.append({
-                'film_id': film_obj.id,
-                'tmdb_id': film_obj.tmdb_id,
-                'title': film_obj.title,
-                'year': film_obj.year,
-                'genres': film_obj.genres if film_obj.genres else [],
-                'language': film_obj.original_language,
-                'poster_url': _build_poster_url(film_obj),
-                'match_score': item.get('match_score', 90),
-                'explanation': item.get('explanation', '')
-            })
-            
-        return results
     finally:
         db.close()
