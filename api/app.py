@@ -12,6 +12,11 @@ from services.enrichment.enrich_job import enrich_and_save_film
 from services.database import SessionLocal
 from services.models import User, UserFilm, FilmEmbeddingJson
 
+class FeedbackRequest(BaseModel):
+    username: str
+    tmdb_id: int
+    title: str
+    action: str  # Pode ser 'seen', 'liked', 'disliked'
 
 class EnrichRequest(BaseModel):
     title: str
@@ -72,20 +77,25 @@ async def sync_status(username: str):
 async def recommendations(
     username: str,
     limit: int = 10,
+    page: int = 1, # Novo parâmetro de paginação
+    reference_movie: str | None = None, # Novo parâmetro de filme base
     rerank: bool = False,
     genre: str | None = None,
     min_year: int | None = None,
     max_year: int | None = None,
     only_unseen: bool = True,
 ):
-    recs = await recommend_for_user(username, limit=limit, genre=genre, min_year=min_year, max_year=max_year, only_unseen=only_unseen)
-    if rerank:
-        user_summary = f"Usuário {username} — histórico recente de {len(recs)} recomendações geradas."
-        try:
-            recs = rerank_with_llm(recs, user_summary=user_summary)
-        except Exception:
-            pass
-    return {"username": username, "recommendations": recs}
+    recs = await recommend_for_user(
+        username=username, 
+        limit=limit, 
+        page=page,
+        reference_movie=reference_movie,
+        genre=genre, 
+        min_year=min_year, 
+        max_year=max_year, 
+        only_unseen=only_unseen
+    )
+    return {"username": username, "page": page, "recommendations": recs}
 
 
 @app.post('/enrich')
@@ -94,5 +104,33 @@ async def enrich(req: EnrichRequest):
     try:
         film = await enrich_and_save_film(db, req.title, req.source_link)
         return {"status": "ok", "film": {"id": film.id, "title": film.title, "tmdb_id": film.tmdb_id}}
+
+
+@app.post('/feedback')
+async def submit_feedback(req: FeedbackRequest):
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == req.username).one_or_none()
+        if not user:
+            return {"status": "error", "message": "Usuário não encontrado"}
+            
+        film = await enrich_and_save_film(db, req.title)
+        
+        uf = db.query(UserFilm).filter(UserFilm.user_id == user.id, UserFilm.film_id == film.id).one_or_none()
+        if not uf:
+            uf = UserFilm(user_id=user.id, film_id=film.id)
+            db.add(uf)
+            
+        if req.action == 'seen':
+            uf.watched_at = text('now()')
+        elif req.action == 'liked':
+            uf.favorite = True
+            uf.watched_at = text('now()')
+        elif req.action == 'disliked':
+            uf.disliked = True
+            uf.watched_at = text('now()')
+            
+        db.commit()
+        return {"status": "success"}
     finally:
         db.close()
