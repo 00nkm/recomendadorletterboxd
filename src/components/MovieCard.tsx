@@ -1,8 +1,10 @@
 import { useState } from 'react'
 
 interface MovieCardProps {
+  username: string
   movie: {
     id: string
+    tmdb_id: number
     title: string
     year: number | null
     genres: string[]
@@ -16,9 +18,38 @@ interface MovieCardProps {
   }
 }
 
-export default function MovieCard({ movie }: MovieCardProps) {
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '')
+
+export default function MovieCard({ movie, username }: MovieCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const [isVisible, setIsVisible] = useState(true)
+  const [isSending, setIsSending] = useState(false)
+
+  const handleFeedback = async (e: React.MouseEvent, action: string) => {
+    e.stopPropagation()
+    setIsSending(true)
+    try {
+      await fetch(`${API_BASE}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username,
+          tmdb_id: movie.tmdb_id,
+          title: movie.title,
+          action: action
+        })
+      })
+      setIsVisible(false)
+    } catch (error) {
+      console.error("Falha ao enviar feedback:", error)
+      setIsSending(false)
+    }
+  }
+
+  if (!isVisible) return null
 
   const scoreColor =
     movie.matchScore >= 95
@@ -32,7 +63,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
   return (
     <article
       className="group border border-border rounded-sm overflow-hidden transition-all duration-300 hover:border-secondary-foreground/30 cursor-pointer flex flex-col"
-      style={{ backgroundColor: 'var(--color-card)' }}
+      style={{ backgroundColor: 'var(--color-card)', opacity: isSending ? 0.5 : 1 }}
       onClick={() => setExpanded((v) => !v)}
     >
       <div className="relative overflow-hidden" style={{ aspectRatio: '2/3', backgroundColor: movie.posterColor }}>
@@ -46,7 +77,6 @@ export default function MovieCard({ movie }: MovieCardProps) {
         ) : (
           <div className="w-full h-full flex items-end p-4" style={{ background: `linear-gradient(to top, ${movie.posterColor}, transparent)` }} />
         )}
-
         <div
           className="absolute top-3 right-3 text-xs font-medium px-2 py-1 rounded-sm backdrop-blur-sm"
           style={{
@@ -58,7 +88,6 @@ export default function MovieCard({ movie }: MovieCardProps) {
         >
           {movie.matchScore}%
         </div>
-
         <div className="absolute inset-x-0 bottom-0 h-16 pointer-events-none" style={{ background: 'linear-gradient(to top, var(--color-card), transparent)' }} />
       </div>
 
@@ -94,7 +123,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
           ))}
         </div>
 
-        <div className="border-t border-border pt-3" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="border-t border-border pt-3 mb-2 flex-grow" style={{ borderColor: 'var(--color-border)' }}>
           <p
             className="text-xs mb-1.5 uppercase tracking-widest"
             style={{
@@ -121,9 +150,36 @@ export default function MovieCard({ movie }: MovieCardProps) {
                 setExpanded((v) => !v)
               }}
             >
-              {expanded ? '↑ less' : '↓ more'}
+              {expanded ? '  less' : '  more'}
             </button>
           )}
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 mt-auto pt-3 border-t border-border" style={{ borderColor: 'var(--color-border)' }}>
+          <button
+            onClick={(e) => handleFeedback(e, 'seen')}
+            disabled={isSending}
+            className="text-xs py-1.5 bg-secondary text-secondary-foreground rounded-sm hover:bg-zinc-800 transition-colors disabled:opacity-50"
+            style={{ fontFamily: 'var(--font-sans)' }}
+          >
+            Já vi
+          </button>
+          <button
+            onClick={(e) => handleFeedback(e, 'liked')}
+            disabled={isSending}
+            className="text-xs py-1.5 bg-green-950/30 text-green-500 rounded-sm hover:bg-green-900/40 transition-colors disabled:opacity-50"
+            style={{ fontFamily: 'var(--font-sans)' }}
+          >
+            Gostei
+          </button>
+          <button
+            onClick={(e) => handleFeedback(e, 'disliked')}
+            disabled={isSending}
+            className="text-xs py-1.5 bg-red-950/30 text-red-500 rounded-sm hover:bg-red-900/40 transition-colors disabled:opacity-50"
+            style={{ fontFamily: 'var(--font-sans)' }}
+          >
+            Ocultar
+          </button>
         </div>
       </div>
     </article>
