@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from services.ingest.job import create_sync_job, get_latest_sync_job
 from services.ingest.poller import fetch_rss_entries, scrape_user_pages
-from services.recommendation.engine import recommend_for_user
+from services.recommendation.engine import recommend_for_user, recommend_for_couple
 from services.recommendation.rerank import rerank_with_llm
 from typing import Optional
 from services.enrichment.enrich_job import enrich_and_save_film
@@ -73,6 +73,12 @@ async def sync_status(username: str):
     finally:
         db.close()
 
+# A rota de casal obrigatoriamente declarada antes para capturar o termo "couple"
+@app.get('/recommendations/couple')
+async def couple_recommendations(user1: str, user2: str, limit: int = 6):
+    data = await recommend_for_couple(user1, user2, limit)
+    return data
+
 @app.get('/recommendations/{username}')
 async def recommendations(
     username: str,
@@ -96,12 +102,6 @@ async def recommendations(
         only_unseen=only_unseen
     )
     return {"username": username, "page": page, "recommendations": recs}
-
-@app.get('/recommendations/couple')
-async def couple_recommendations(user1: str, user2: str, limit: int = 6):
-    from services.recommendation.engine import recommend_for_couple
-    data = await recommend_for_couple(user1, user2, limit)
-    return data
 
 @app.post('/enrich')
 async def enrich(req: EnrichRequest):
