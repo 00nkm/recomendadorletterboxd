@@ -133,7 +133,7 @@ export default function MovieCard({ movie, username }: MovieCardProps) {
               letterSpacing: '0.1em',
             }}
           >
-            Why you'll love it
+            Por que você vai gostar
           </p>
           <p
             className={`text-secondary-foreground text-xs leading-relaxed overflow-hidden transition-all duration-300 ${expanded ? 'line-clamp-none' : 'line-clamp-3'}`}
@@ -150,7 +150,7 @@ export default function MovieCard({ movie, username }: MovieCardProps) {
                 setExpanded((v) => !v)
               }}
             >
-              {expanded ? '  less' : '  more'}
+              {expanded ? '  menos' : '  mais'}
             </button>
           )}
         </div>
