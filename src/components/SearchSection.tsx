@@ -1,17 +1,18 @@
 import { useState, type FormEvent } from 'react'
 
 interface SearchSectionProps {
-  onSearch: (username: string) => void
+  onSearch: (username: string, referenceMovie: string) => void
   isLoading: boolean
   hasResults: boolean
 }
 
 export default function SearchSection({ onSearch, isLoading, hasResults }: SearchSectionProps) {
-  const [value, setValue] = useState('')
+  const [username, setUsername] = useState('')
+  const [referenceMovie, setReferenceMovie] = useState('')
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
-    if (value.trim()) onSearch(value.trim())
+    if (username.trim()) onSearch(username.trim(), referenceMovie.trim())
   }
 
   return (
@@ -44,55 +45,71 @@ export default function SearchSection({ onSearch, isLoading, hasResults }: Searc
             </p>
           </>
         )}
-
-        <form onSubmit={handleSubmit} className="flex gap-3">
-          <div className="flex-1 relative">
-            <span
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm select-none pointer-events-none"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              letterboxd.com/
-            </span>
-            <input
-              type="text"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="yourusername"
-              className="w-full bg-card border border-border text-foreground placeholder-muted-foreground
-                         rounded-sm outline-none transition-all duration-200 text-sm
-                         focus:border-primary focus:ring-1 focus:ring-ring"
-              style={{
-                paddingLeft: '8.75rem',
-                paddingRight: '1rem',
-                paddingTop: '0.75rem',
-                paddingBottom: '0.75rem',
-                fontFamily: 'var(--font-sans)',
-              }}
-              disabled={isLoading}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={isLoading || !value.trim()}
-            className="bg-primary text-primary-foreground text-sm font-medium px-6 py-3 rounded-sm
-                       transition-all duration-200 hover:opacity-90 active:scale-[0.98]
-                       disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-            style={{ fontFamily: 'var(--font-sans)' }}
-          >
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                Analyzing
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <div className="flex gap-3 flex-col sm:flex-row">
+            <div className="flex-1 relative">
+              <span
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm select-none pointer-events-none"
+                style={{ fontFamily: 'var(--font-mono)' }}
+              >
+                letterboxd.com/
               </span>
-            ) : (
-              'Get Recommendations'
-            )}
-          </button>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="yourusername"
+                className="w-full bg-card border border-border text-foreground placeholder-muted-foreground
+                           rounded-sm outline-none transition-all duration-200 text-sm
+                           focus:border-primary focus:ring-1 focus:ring-ring"
+                style={{
+                  paddingLeft: '8.75rem',
+                  paddingRight: '1rem',
+                  paddingTop: '0.75rem',
+                  paddingBottom: '0.75rem',
+                  fontFamily: 'var(--font-sans)',
+                }}
+                disabled={isLoading}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isLoading || !username.trim()}
+              className="bg-primary text-primary-foreground text-sm font-medium px-6 py-3 rounded-sm
+                         transition-all duration-200 hover:opacity-90 active:scale-[0.98]
+                         disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+              style={{ fontFamily: 'var(--font-sans)' }}
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  Analyzing
+                </span>
+              ) : (
+                'Get Recommendations'
+              )}
+            </button>
+          </div>
+          <div className="flex-1">
+             <input
+                type="text"
+                value={referenceMovie}
+                onChange={(e) => setReferenceMovie(e.target.value)}
+                placeholder="Inspirado em qual filme? (Opcional)"
+                className="w-full bg-card border border-border text-foreground placeholder-muted-foreground
+                           rounded-sm outline-none transition-all duration-200 text-sm
+                           focus:border-primary focus:ring-1 focus:ring-ring"
+                style={{
+                  padding: '0.75rem 1rem',
+                  fontFamily: 'var(--font-sans)',
+                }}
+                disabled={isLoading}
+              />
+          </div>
         </form>
-
         {!hasResults && (
           <p className="text-muted-foreground text-xs mt-4 leading-relaxed">
             We only read your public Letterboxd data. No account required.
