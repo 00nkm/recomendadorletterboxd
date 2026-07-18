@@ -139,7 +139,7 @@ interface CouplePageProps {
   defaultUser2?: string
 }
 
-export default function CouplePage({ defaultUser1 = '', defaultUser2 = '' }: CouplePageProps) {
+export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'reliquarystar' }: CouplePageProps) {
   const [user1, setUser1] = useState(defaultUser1)
   const [user2, setUser2] = useState(defaultUser2)
   const [isLoading, setIsLoading] = useState(false)
