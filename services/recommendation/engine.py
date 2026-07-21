@@ -192,7 +192,7 @@ async def recommend_for_user(
         db.close()
 
 
-async def recommend_for_couple(user1_username: str, user2_username: str, limit: int = 6, exclude: str | None = None) -> Dict:
+async def recommend_for_couple(user1_username: str, user2_username: str, limit: int = 6, exclude: str | None = None, page: int = 1) -> Dict:
     db = SessionLocal()
     try:
         u1 = db.query(User).filter(User.username == user1_username).one_or_none()
@@ -250,6 +250,9 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
         if exclude:
             filtros += f"Jamais recomende os seguintes títulos, eles já estão na tela do usuário neste momento: {exclude}. "
             
+        if page > 1:
+            filtros += f"Esta é a página {page} de busca. Vá mais fundo no catálogo, sugira filmes menos óbvios e evite clássicos batidos. "
+            
         prompt = (
             f"Você atua como um curador cinematográfico focado em casais. Analise os perfis: {perfil} "
             f"{filtros}"
@@ -267,11 +270,14 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
             "Content-Type": "application/json"
         }
         
+        # Maior temperatura (criatividade) conforme o número de rolagens da página
+        temperatura_calculada = 0.7 if page == 1 else min(0.95, 0.7 + (page * 0.05))
+        
         payload = {
             "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"},
-            "temperature": 0.70
+            "temperature": temperatura_calculada
         }
         
         async with httpx.AsyncClient(timeout=30.0) as client:

@@ -74,8 +74,8 @@ async def sync_status(username: str):
         db.close()
 
 @app.get('/recommendations/couple')
-async def couple_recommendations(user1: str, user2: str, limit: int = 6, exclude: str | None = None):
-    data = await recommend_for_couple(user1, user2, limit, exclude)
+async def couple_recommendations(user1: str, user2: str, limit: int = 6, exclude: str | None = None, page: int = 1):
+    data = await recommend_for_couple(user1, user2, limit, exclude, page)
     return data
 
 @app.get('/recommendations/{username}')

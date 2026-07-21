@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import MovieCard from '../components/MovieCard'
 
 interface CoupleMovie {
   id: number
@@ -12,17 +13,58 @@ interface CoupleMovie {
   note?: string
 }
 
-interface CoupleRec {
-  id: number
+interface RecommendationCard {
+  id: string
   tmdb_id: number
   title: string
-  year: number
-  director: string
-  posterUrl: string
-  posterColor: string
-  matchScore: number
-  reason: string
+  year: number | null
   genres: string[]
+  moods: string[]
+  decade: string
+  matchScore: number
+  matchReason: string
+  runtime: number | null
+  posterUrl: string | null
+  posterColor: string
+}
+
+// Helpers formatadores de gêneros
+const deriveMood = (genres: string[]) => {
+  if (genres.some((g) => g.toLowerCase() === 'horror')) return 'Dark'
+  if (genres.some((g) => g.toLowerCase() === 'comedy')) return 'Uplifting'
+  if (genres.some((g) => g.toLowerCase() === 'sci-fi')) return 'Mind-bending'
+  if (genres.some((g) => g.toLowerCase() === 'romance')) return 'Emotional'
+  if (genres.some((g) => g.toLowerCase() === 'drama')) return 'Melancholic'
+  return 'Emotional'
+}
+
+const deriveDecade = (year: number | null) => {
+  if (!year) return '2020s'
+  if (year >= 2020) return '2020s'
+  if (year >= 2010) return '2010s'
+  if (year >= 2000) return '2000s'
+  if (year >= 1990) return '1990s'
+  return 'Classic'
+}
+
+// Transformador de resposta da API
+const formatCoupleRec = (item: any, index: number): RecommendationCard => {
+  const score = Math.min(99, Math.max(80, Math.round(item.matchScore || 90)))
+  const genres = item.genres?.length ? item.genres : ['Drama']
+  return {
+    id: `${item.title}-${index}-${Date.now()}`,
+    tmdb_id: item.tmdb_id || 0,
+    title: item.title,
+    year: item.year,
+    genres,
+    moods: [deriveMood(genres)],
+    decade: deriveDecade(item.year),
+    matchScore: score,
+    matchReason: item.reason || 'Sinergia com os gostos do casal.',
+    runtime: null,
+    posterUrl: item.posterUrl ?? null,
+    posterColor: '#111113',
+  }
 }
 
 function StarRating({ value, max = 5 }: { value: number; max?: number }) {
@@ -88,51 +130,6 @@ function WatchedCard({ film, user1, user2 }: { film: CoupleMovie, user1: string,
   )
 }
 
-function RecCard({ film }: { film: CoupleRec }) {
-  const [expanded, setExpanded] = useState(false)
-  return (
-    <div
-      className="border border-border rounded-sm overflow-hidden flex flex-col transition-all duration-200 hover:border-[#c97d8a]/30 cursor-pointer"
-      style={{ backgroundColor: 'var(--color-card)' }}
-      onClick={() => setExpanded((v) => !v)}
-    >
-      <div className="relative overflow-hidden" style={{ aspectRatio: '2/3', backgroundColor: film.posterColor }}>
-        <img
-          src={film.posterUrl}
-          alt={film.title}
-          className="w-full h-full object-cover transition-transform duration-500 hover:scale-[1.04]"
-          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-        />
-        <div
-          className="absolute top-3 right-3 text-xs font-medium px-2 py-1 rounded-sm backdrop-blur-sm"
-          style={{ fontFamily: 'var(--font-mono)', backgroundColor: 'rgba(9,9,11,0.8)', color: '#c97d8a', border: '1px solid rgba(201,125,138,0.35)' }}
-        >
-          {film.matchScore}%
-        </div>
-        <div className="absolute inset-x-0 bottom-0 h-16 pointer-events-none" style={{ background: 'linear-gradient(to top, var(--color-card), transparent)' }} />
-      </div>
-      <div className="p-3 flex flex-col gap-2 flex-1">
-        <h3 className="text-foreground leading-tight text-sm" style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>
-          {film.title}
-        </h3>
-        <p className="text-muted-foreground text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-          {film.year}
-        </p>
-        <div className="flex gap-1.5 flex-wrap">
-          {film.genres?.map((g) => (
-            <span key={g} className="text-xs px-2 py-0.5 border border-border text-muted-foreground rounded-sm">{g}</span>
-          ))}
-        </div>
-        <div className="border-t border-border pt-2">
-          <p className={`text-secondary-foreground text-xs leading-relaxed ${expanded ? '' : 'line-clamp-3'}`} style={{ fontFamily: 'var(--font-sans)' }}>
-            {film.reason}
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 interface CouplePageProps {
   defaultUser1?: string
   defaultUser2?: string
@@ -142,11 +139,13 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
   const [user1, setUser1] = useState(defaultUser1)
   const [user2, setUser2] = useState(defaultUser2)
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [hasResults, setHasResults] = useState(false)
-  const [statusMessage, setStatusMessage] = useState('Cruzando os nossos gostos....')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [statusMessage, setStatusMessage] = useState('Cruzando os gostos de vocês...')
   
   const [watchedTogether, setWatchedTogether] = useState<CoupleMovie[]>([])
-  const [coupleRecs, setCoupleRecs] = useState<CoupleRec[]>([])
+  const [coupleRecs, setCoupleRecs] = useState<RecommendationCard[]>([])
 
   const API_BASE = (import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '')
 
@@ -156,6 +155,7 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
     
     setIsLoading(true)
     setHasResults(false)
+    setCurrentPage(1)
     setStatusMessage('Sincronizando os dois perfis...')
 
     try {
@@ -182,14 +182,16 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
           return pollStatus()
         }
 
-        setStatusMessage('Gerando as recomendações perfeitas para noses.....')
-        const recRes = await fetch(`${API_BASE}/recommendations/couple?user1=${encodeURIComponent(user1)}&user2=${encodeURIComponent(user2)}`)
+        setStatusMessage('Gerando as recomendações perfeitas para o casal...')
+        const recRes = await fetch(`${API_BASE}/recommendations/couple?user1=${encodeURIComponent(user1)}&user2=${encodeURIComponent(user2)}&limit=6&page=1`)
         
         if (!recRes.ok) throw new Error('Falha ao obter indicações.')
         
         const data = await recRes.json()
         setWatchedTogether(data.watched_together || [])
-        setCoupleRecs(data.recommendations || [])
+        
+        const formattedRecs = (data.recommendations || []).map((item: any, i: number) => formatCoupleRec(item, i))
+        setCoupleRecs(formattedRecs)
         setHasResults(true)
       }
 
@@ -199,6 +201,35 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
       setStatusMessage('Ocorreu um erro. Tente novamente mais tarde.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleLoadMore = async () => {
+    if (!user1 || !user2) return
+    setIsLoadingMore(true)
+    const nextPage = currentPage + 1
+    try {
+      const excludeParam = coupleRecs.map(r => r.title).join(',')
+      const params = new URLSearchParams({
+        user1,
+        user2,
+        limit: '6',
+        page: nextPage.toString(),
+      })
+      if (excludeParam) params.append('exclude', excludeParam)
+
+      const res = await fetch(`${API_BASE}/recommendations/couple?${params}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error('Falha ao carregar mais.')
+      
+      const data = await res.json()
+      const newItems = (data.recommendations || []).map((item: any, i: number) => formatCoupleRec(item, coupleRecs.length + i))
+      
+      setCoupleRecs(prev => [...prev, ...newItems])
+      setCurrentPage(nextPage)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsLoadingMore(false)
     }
   }
 
@@ -356,8 +387,8 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
                 Curados a partir dos gostos combinados de vocês dois. Clique em um card para mais detalhes.
               </p>
               {coupleRecs.length > 0 ? (
-                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
-                  {coupleRecs.map((f) => <RecCard key={f.id} film={f} />)}
+                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+                  {coupleRecs.map((f) => <MovieCard key={f.id} movie={f} username={user1} />)}
                 </div>
               ) : (
                 <p className="text-muted-foreground text-sm" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -366,10 +397,25 @@ export default function CouplePage({ defaultUser1 = 'vnleo', defaultUser2 = 'rel
               )}
             </div>
           </div>
+          
+          {coupleRecs.length > 0 && (
+            <div className="px-6 pb-6 max-w-7xl mx-auto flex justify-center mt-2">
+              <button
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className="px-6 py-3 border border-border text-foreground text-sm font-medium rounded-sm
+                          transition-all duration-200 hover:bg-secondary active:scale-[0.98]
+                          disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ fontFamily: 'var(--font-sans)' }}
+              >
+                {isLoadingMore ? 'Carregando mais filmes...' : 'Carregar mais recomendações'}
+              </button>
+            </div>
+          )}
 
           <div className="px-6 pb-10 max-w-7xl mx-auto">
             <p className="text-muted-foreground text-xs border-t border-border pt-6" style={{ fontFamily: 'var(--font-mono)' }}>
-              Recomendações geradas cruzando o perfil de avaliações dos dois usuários. Os dados evoluem junto com a atividade de vocês.
+              Recomendações geradas cruzando o perfil de avaliações dos dois usuários. Qualquer feedback (Já vi/Gostei) inserido aqui salva os dados para o usuário principal (@{user1}).
             </p>
           </div>
         </>
