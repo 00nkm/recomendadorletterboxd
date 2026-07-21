@@ -2,6 +2,7 @@ import json
 import os
 import re
 import httpx
+import asyncio
 from typing import List, Dict
 from services.database import SessionLocal
 from services.models import User, UserFilm, Film
@@ -11,6 +12,78 @@ def _build_poster_url(film: Film) -> str | None:
     if film.poster_path:
         return f'https://image.tmdb.org/t/p/w342{film.poster_path}'
     return None
+
+# Wrappers de segurança: abrem conexões isoladas para permitir processamento simultâneo
+async def _safe_enrich_single(item: dict) -> dict | None:
+    local_db = SessionLocal()
+    try:
+        film_obj = await enrich_and_save_film(local_db, item['title'])
+        if not film_obj:
+            return None
+        return {
+            'film_id': film_obj.id,
+            'tmdb_id': film_obj.tmdb_id,
+            'title': film_obj.title,
+            'year': film_obj.year,
+            'genres': list(film_obj.genres) if film_obj.genres else [],
+            'language': film_obj.original_language,
+            'poster_url': _build_poster_url(film_obj),
+            'match_score': item.get('match_score', 90),
+            'explanation': item.get('explanation', '')
+        }
+    except Exception as e:
+        print(f"Erro no processamento paralelo: {e}")
+        return None
+    finally:
+        local_db.close()
+
+async def _safe_enrich_couple(item: dict) -> dict | None:
+    local_db = SessionLocal()
+    try:
+        film_obj = await enrich_and_save_film(local_db, item['title'])
+        if not film_obj:
+            return None
+        return {
+            'id': film_obj.id,
+            'tmdb_id': film_obj.tmdb_id,
+            'title': film_obj.title,
+            'year': film_obj.year,
+            'director': '',
+            'genres': list(film_obj.genres) if film_obj.genres else [],
+            'posterUrl': _build_poster_url(film_obj),
+            'posterColor': '#111113',
+            'matchScore': item.get('match_score', 90),
+            'reason': item.get('explanation', '')
+        }
+    except Exception as e:
+        print(f"Erro no processamento paralelo de casal: {e}")
+        return None
+    finally:
+        local_db.close()
+
+async def _safe_enrich_nenoca(titulo: str, u1_ratings: dict, u2_ratings: dict) -> dict | None:
+    local_db = SessionLocal()
+    try:
+        f_obj = await enrich_and_save_film(local_db, titulo)
+        if not f_obj:
+            return None
+        fid = f_obj.id
+        r1 = u1_ratings.get(fid, 0)
+        r2 = u2_ratings.get(fid, 0)
+        return {
+            "id": fid,
+            "tmdb_id": f_obj.tmdb_id,
+            "title": f_obj.title,
+            "year": f_obj.year,
+            "director": "",
+            "posterUrl": _build_poster_url(f_obj),
+            "posterColor": "#1a1228",
+            "rating": {"you": r1, "partner": r2}
+        }
+    except Exception:
+        return None
+    finally:
+        local_db.close()
 
 async def recommend_for_user(
     username: str,
@@ -95,22 +168,12 @@ async def recommend_for_user(
         
         rec_list = data.get('recommendations', [])
         
-        results = []
-        for item in rec_list:
-            film_obj = await enrich_and_save_film(db, item['title'])
-            
-            results.append({
-                'film_id': film_obj.id,
-                'tmdb_id': film_obj.tmdb_id,
-                'title': film_obj.title,
-                'year': film_obj.year,
-                'genres': film_obj.genres if film_obj.genres else [],
-                'language': film_obj.original_language,
-                'poster_url': _build_poster_url(film_obj),
-                'match_score': item.get('match_score', 90),
-                'explanation': item.get('explanation', '')
-            })
-            
+        # Disparo assíncrono massivo
+        tarefas = [_safe_enrich_single(item) for item in rec_list]
+        resultados = await asyncio.gather(*tarefas)
+        
+        # Filtra os resultados que retornaram com sucesso
+        results = [r for r in resultados if r is not None]
         return results
     finally:
         db.close()
@@ -130,7 +193,6 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
         
         film_lookup = {film.id: film for film in db.query(Film).all()}
         
-        # Insira os nomes em inglês das obras que vocês assistiram juntos
         FILMES_NENOCA = [
             "The Drama",
             "The Ugly Stepsister",
@@ -141,23 +203,12 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
             "The Flesh Itself"
         ]
         
-        watched_together = []
-        for titulo in FILMES_NENOCA:
-            f_obj = await enrich_and_save_film(db, titulo)
-            
-            r1 = next((uf.rating for uf in u1_films if uf.film_id == f_obj.id), 0) or 0
-            r2 = next((uf.rating for uf in u2_films if uf.film_id == f_obj.id), 0) or 0
-            
-            watched_together.append({
-                "id": f_obj.id,
-                "tmdb_id": f_obj.tmdb_id,
-                "title": f_obj.title,
-                "year": f_obj.year,
-                "director": "",
-                "posterUrl": _build_poster_url(f_obj),
-                "posterColor": "#1a1228",
-                "rating": {"you": r1, "partner": r2}
-            })
+        u1_ratings = {uf.film_id: uf.rating for uf in u1_films if uf.rating}
+        u2_ratings = {uf.film_id: uf.rating for uf in u2_films if uf.rating}
+        
+        tarefas_nenoca = [_safe_enrich_nenoca(titulo, u1_ratings, u2_ratings) for titulo in FILMES_NENOCA]
+        resultados_nenoca = await asyncio.gather(*tarefas_nenoca)
+        watched_together = [r for r in resultados_nenoca if r is not None]
             
         fav1 = [film_lookup[uf.film_id].title for uf in u1_films if getattr(uf, 'favorite', False) and uf.film_id in film_lookup]
         if not fav1:
@@ -216,21 +267,13 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
             except Exception:
                 data = {"recommendations": []}
         
-        results = []
-        for item in data.get('recommendations', []):
-            film_obj = await enrich_and_save_film(db, item['title'])
-            results.append({
-                'id': film_obj.id,
-                'tmdb_id': film_obj.tmdb_id,
-                'title': film_obj.title,
-                'year': film_obj.year,
-                'director': '',
-                'genres': film_obj.genres if film_obj.genres else [],
-                'posterUrl': _build_poster_url(film_obj),
-                'posterColor': '#111113',
-                'matchScore': item.get('match_score', 90),
-                'reason': item.get('explanation', '')
-            })
+        rec_list = data.get('recommendations', [])
+        
+        # Disparo assíncrono massivo
+        tarefas_recs = [_safe_enrich_couple(item) for item in rec_list]
+        resultados_recs = await asyncio.gather(*tarefas_recs)
+        
+        results = [r for r in resultados_recs if r is not None]
             
         return {"watched_together": watched_together, "recommendations": results}
     finally:
