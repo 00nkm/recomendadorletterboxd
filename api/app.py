@@ -1,4 +1,5 @@
 import os
+import httpx
 from datetime import datetime
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import RedirectResponse
@@ -103,6 +104,27 @@ async def recommendations(
         exclude=exclude
     )
     return {"username": username, "page": page, "recommendations": recs}
+
+# --- NOVA ROTA DE GALERIA DE IMAGENS ---
+@app.get('/movie-images/{tmdb_id}')
+async def movie_images(tmdb_id: int):
+    api_key = os.getenv('TMDB_API_KEY')
+    if not api_key:
+        return {"images": []}
+    
+    url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/images"
+    # include_image_language=null,en força o TMDB a devolver fotos limpas (sem logos/títulos na imagem)
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        try:
+            r = await client.get(url, params={"api_key": api_key, "include_image_language": "null,en"})
+            if r.status_code == 200:
+                data = r.json()
+                backdrops = data.get("backdrops", [])[:6]
+                urls = [f"https://image.tmdb.org/t/p/w780{b['file_path']}" for b in backdrops]
+                return {"images": urls}
+        except Exception:
+            pass
+    return {"images": []}
 
 @app.post('/enrich')
 async def enrich(req: EnrichRequest):

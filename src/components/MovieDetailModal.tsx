@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface Movie {
   id: string
@@ -20,21 +20,15 @@ interface MovieDetailModalProps {
   onClose: () => void
 }
 
-// Gallery images use picsum with seeds derived from movie title.
-// Replace these URLs with your Pinterest/Google Images API calls.
-function getGalleryImages(title: string): string[] {
-  const base = encodeURIComponent(title.toLowerCase().replace(/\s+/g, '-'))
-  return Array.from({ length: 6 }, (_, i) =>
-    `https://picsum.photos/seed/${base}-${i + 1}/600/400`
-  )
-}
-
 const scoreColor = (score: number) =>
   score >= 95 ? '#d4a647' : score >= 88 ? '#a89060' : '#6e6b66'
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '')
+
 export default function MovieDetailModal({ movie, onClose }: MovieDetailModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
-  const images = getGalleryImages(movie.title)
+  const [images, setImages] = useState<string[]>([])
+  const [isLoadingImages, setIsLoadingImages] = useState(true)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -45,6 +39,28 @@ export default function MovieDetailModal({ movie, onClose }: MovieDetailModalPro
       document.body.style.overflow = ''
     }
   }, [onClose])
+
+  useEffect(() => {
+    const fetchImages = async () => {
+      if (!movie.tmdb_id) {
+        setIsLoadingImages(false)
+        return
+      }
+      try {
+        const res = await fetch(`${API_BASE}/movie-images/${movie.tmdb_id}`)
+        if (res.ok) {
+          const data = await res.json()
+          setImages(data.images || [])
+        }
+      } catch (e) {
+        console.error('Falha ao carregar imagens do filme:', e)
+      } finally {
+        setIsLoadingImages(false)
+      }
+    }
+    
+    fetchImages()
+  }, [movie.tmdb_id])
 
   return (
     <div
@@ -157,7 +173,7 @@ export default function MovieDetailModal({ movie, onClose }: MovieDetailModalPro
                   Galeria
                 </p>
                 <p className="text-muted-foreground text-xs mt-0.5" style={{ fontFamily: 'var(--font-sans)' }}>
-                  Imagens de referência do filme
+                  Imagens oficiais do filme
                 </p>
               </div>
               <div className="flex gap-2">
@@ -188,31 +204,36 @@ export default function MovieDetailModal({ movie, onClose }: MovieDetailModalPro
               </div>
             </div>
 
-            {/* Photo grid — replace src with Pinterest/Google Images API */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {images.map((src, i) => (
-                <div
-                  key={i}
-                  className="overflow-hidden rounded-sm"
-                  style={{ aspectRatio: '3/2', backgroundColor: 'var(--color-muted)' }}
-                >
-                  <img
-                    src={src}
-                    alt={`${movie.title} - imagem ${i + 1}`}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
+              {isLoadingImages ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="overflow-hidden rounded-sm animate-pulse"
+                    style={{ aspectRatio: '3/2', backgroundColor: 'var(--color-border)' }}
                   />
-                </div>
-              ))}
+                ))
+              ) : images.length > 0 ? (
+                images.map((src, i) => (
+                  <div
+                    key={i}
+                    className="overflow-hidden rounded-sm"
+                    style={{ aspectRatio: '3/2', backgroundColor: 'var(--color-muted)' }}
+                  >
+                    <img
+                      src={src}
+                      alt={`${movie.title} - cena ${i + 1}`}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                    />
+                  </div>
+                ))
+              ) : (
+                <p className="text-muted-foreground text-xs col-span-full pt-4">
+                  Nenhuma imagem oficial foi encontrada para este título.
+                </p>
+              )}
             </div>
-
-            <p
-              className="text-muted-foreground text-xs"
-              style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem' }}
-            >
-              {/* Replace placeholder images with your Pinterest or Google Images API integration */}
-              Imagens ilustrativas · conecte sua API do Pinterest ou Google para exibir fotos reais do filme
-            </p>
           </div>
         </div>
       </div>
