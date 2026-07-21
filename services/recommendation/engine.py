@@ -17,7 +17,7 @@ def _build_poster_url(film: Film) -> str | None:
 async def _safe_enrich_single(item: dict) -> dict | None:
     local_db = SessionLocal()
     try:
-        film_obj = await enrich_and_save_film(local_db, item['title'])
+        film_obj = await enrich_and_save_film(local_db, item['title'], suggested_year=item.get('year'))
         if not film_obj:
             return None
         return {
@@ -40,7 +40,7 @@ async def _safe_enrich_single(item: dict) -> dict | None:
 async def _safe_enrich_couple(item: dict) -> dict | None:
     local_db = SessionLocal()
     try:
-        film_obj = await enrich_and_save_film(local_db, item['title'])
+        film_obj = await enrich_and_save_film(local_db, item['title'], suggested_year=item.get('year'))
         if not film_obj:
             return None
         return {

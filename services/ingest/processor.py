@@ -8,7 +8,6 @@ from services.enrichment.enrich_job import enrich_and_save_film
 from sqlalchemy.exc import NoResultFound
 from datetime import datetime
 
-
 def _extract_rating(description: Optional[str]) -> int | None:
     if not description:
         return None
@@ -21,42 +20,46 @@ def _extract_rating(description: Optional[str]) -> int | None:
             return None
     return None
 
+def _clean_rss_title(raw_title: str) -> str:
+    # Apara as pontas do Letterboxd (ex: ", 2021 - ★★★★", ", 2021" ou " - ★")
+    clean = re.sub(r'(?:,\s*\d{4})?(?:\s*-\s*[★½]+)?$', '', raw_title)
+    return clean.strip()
 
 async def process_rss_items(username: str, items: List[Dict], job_id: int | None = None) -> int:
-    """Persiste entradas do RSS no banco e dispara enriquecimento.
-
-    Nota: função async para compatibilidade com callers async, mas usa DB sync.
-    """
     db = SessionLocal()
     try:
         if job_id is not None:
             update_sync_job(job_id, 'processing', message=f'Processando {len(items)} itens')
-
+            
         user = db.query(User).filter(User.username == username).one_or_none()
         if not user:
             user = User(username=username)
             db.add(user)
             db.commit()
             db.refresh(user)
-
+            
         for it in items:
-            title = it.get('title') or 'Untitled'
+            raw_title = it.get('title') or 'Untitled'
+            title = _clean_rss_title(raw_title)
             link = it.get('link')
             pubDate = it.get('pubDate')
+            
             try:
                 film = db.query(Film).filter(Film.title == title).one_or_none()
                 if not film:
-                    film = await enrich_and_save_film(db, title, link)
-
+                    film = await enrich_and_save_film(db, title, source_link=link)
+                    
                 rating = _extract_rating(it.get('description'))
                 existing = db.query(UserFilm).filter(UserFilm.user_id == user.id, UserFilm.film_id == film.id).one_or_none()
+                
                 if not existing:
                     watched_at = None
                     try:
                         if pubDate:
                             watched_at = parsedate_to_datetime(pubDate)
                     except Exception:
-                        watched_at = None
+                        pass
+                        
                     uf = UserFilm(
                         user_id=user.id,
                         film_id=film.id,
@@ -65,11 +68,13 @@ async def process_rss_items(username: str, items: List[Dict], job_id: int | None
                         rating=rating,
                         favorite='favorite' in (it.get('description') or '').lower() or 'favourite' in (it.get('description') or '').lower(),
                         in_watchlist='watchlist' in (it.get('description') or '').lower(),
-                        tags=it.get('tags', []) # <-- Novo campo
+                        tags=it.get('tags', [])
                     )
                     db.add(uf)
-            except Exception:
+            except Exception as e:
+                print(f"Erro ao processar item {title}: {e}")
                 continue
+                
         db.commit()
         film_count = db.query(UserFilm).filter(UserFilm.user_id == user.id).count()
         if job_id is not None:
