@@ -13,7 +13,6 @@ def _build_poster_url(film: Film) -> str | None:
         return f'https://image.tmdb.org/t/p/w342{film.poster_path}'
     return None
 
-# Wrappers de segurança: abrem conexões isoladas para permitir processamento simultâneo
 async def _safe_enrich_single(item: dict) -> dict | None:
     local_db = SessionLocal()
     try:
@@ -94,6 +93,7 @@ async def recommend_for_user(
     min_year: int | None = None,
     max_year: int | None = None,
     only_unseen: bool = True,
+    exclude: str | None = None,
 ) -> List[Dict]:
     db = SessionLocal()
     try:
@@ -103,6 +103,8 @@ async def recommend_for_user(
             
         user_films = db.query(UserFilm).filter(UserFilm.user_id == user.id).all()
         film_lookup = {film.id: film for film in db.query(Film).all()}
+        
+        seen_titles = {film_lookup[uf.film_id].title.lower() for uf in user_films if uf.film_id in film_lookup}
         
         favoritos = [film_lookup[uf.film_id].title for uf in user_films if uf.favorite and uf.film_id in film_lookup]
         disliked = [film_lookup[uf.film_id].title for uf in user_films if getattr(uf, 'disliked', False) and uf.film_id in film_lookup]
@@ -124,6 +126,9 @@ async def recommend_for_user(
         if reference_movie:
             filtros += f"Atenção máxima: O usuário pediu filmes especificamente parecidos com '{reference_movie}'. Use esse filme como âncora principal da curadoria. "
 
+        if exclude:
+            filtros += f"Jamais recomende os seguintes títulos, eles já estão desenhados na tela do usuário neste momento: {exclude}. "
+
         if page > 1:
             filtros += f"Esta é a página {page} de busca. Pule os resultados comerciais. Traga joias escondidas que se encaixem perfeitamente no perfil. "
             
@@ -131,7 +136,7 @@ async def recommend_for_user(
             f"Você atua como um curador cinematográfico de alto nível. Analise as informações: {perfil} "
             f"{filtros}"
             "Encontre paralelos do gosto do usuário em tópicos do r/TrueFilm, r/movies do Reddit e listas aclamadas do Letterboxd. "
-            f"Gere {limit} indicações excelentes que o usuário não tenha visto. "
+            f"Gere {limit + 4} indicações excelentes que o usuário não tenha visto. "
             "Responda estritamente com um JSON nesta estrutura: "
             "{\"recommendations\": [{\"title\": \"Nome Original em Inglês\", \"year\": 2000, \"match_score\": 95, \"explanation\": \"Justificativa técnica da escolha.\"}]}"
         )
@@ -167,19 +172,27 @@ async def recommend_for_user(
                 data = {"recommendations": []}
         
         rec_list = data.get('recommendations', [])
+        excluded_set = {t.strip().lower() for t in exclude.split(',')} if exclude else set()
         
-        # Disparo assíncrono massivo
-        tarefas = [_safe_enrich_single(item) for item in rec_list]
+        valid_recs = []
+        for item in rec_list:
+            t_lower = item['title'].lower()
+            if only_unseen and t_lower in seen_titles:
+                continue
+            if t_lower in excluded_set:
+                continue
+            valid_recs.append(item)
+        
+        tarefas = [_safe_enrich_single(item) for item in valid_recs[:limit]]
         resultados = await asyncio.gather(*tarefas)
         
-        # Filtra os resultados que retornaram com sucesso
         results = [r for r in resultados if r is not None]
         return results
     finally:
         db.close()
 
 
-async def recommend_for_couple(user1_username: str, user2_username: str, limit: int = 6) -> Dict:
+async def recommend_for_couple(user1_username: str, user2_username: str, limit: int = 6, exclude: str | None = None) -> Dict:
     db = SessionLocal()
     try:
         u1 = db.query(User).filter(User.username == user1_username).one_or_none()
@@ -192,6 +205,10 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
         u2_films = db.query(UserFilm).filter(UserFilm.user_id == u2.id).all()
         
         film_lookup = {film.id: film for film in db.query(Film).all()}
+        
+        seen_u1 = {film_lookup[uf.film_id].title.lower() for uf in u1_films if uf.film_id in film_lookup}
+        seen_u2 = {film_lookup[uf.film_id].title.lower() for uf in u2_films if uf.film_id in film_lookup}
+        seen_both = seen_u1.union(seen_u2)
         
         FILMES_NENOCA = [
             "The Drama",
@@ -230,11 +247,14 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
         if disliked:
             filtros += f"Jamais indique os seguintes títulos: {', '.join(disliked[:10])}. "
             
+        if exclude:
+            filtros += f"Jamais recomende os seguintes títulos, eles já estão na tela do usuário neste momento: {exclude}. "
+            
         prompt = (
             f"Você atua como um curador cinematográfico focado em casais. Analise os perfis: {perfil} "
             f"{filtros}"
             "Atenção máxima: Suas recomendações devem ser DIRETAMENTE baseadas e inspiradas na lista de 'Filmes que eles amam assistir juntos'. Use os gostos individuais apenas para refinar a busca, garantindo que nenhum dos dois vai odiar a sugestão. "
-            f"Gere {limit} indicações excelentes para o próximo encontro do casal. Evite resultados muito óbvios. "
+            f"Gere {limit + 4} indicações excelentes para o próximo encontro do casal. Evite resultados muito óbvios. "
             "Responda estritamente com um JSON nesta estrutura: "
             "{\"recommendations\": [{\"title\": \"Nome Original em Inglês\", \"year\": 2000, \"match_score\": 95, \"explanation\": \"Explique como a estética e a narrativa deste filme dialogam com a lista de obras conjuntas deles.\"}]}"
         )
@@ -268,9 +288,16 @@ async def recommend_for_couple(user1_username: str, user2_username: str, limit: 
                 data = {"recommendations": []}
         
         rec_list = data.get('recommendations', [])
+        excluded_set = {t.strip().lower() for t in exclude.split(',')} if exclude else set()
         
-        # Disparo assíncrono massivo
-        tarefas_recs = [_safe_enrich_couple(item) for item in rec_list]
+        valid_recs = []
+        for item in rec_list:
+            t_lower = item['title'].lower()
+            if t_lower in seen_both or t_lower in excluded_set:
+                continue
+            valid_recs.append(item)
+        
+        tarefas_recs = [_safe_enrich_couple(item) for item in valid_recs[:limit]]
         resultados_recs = await asyncio.gather(*tarefas_recs)
         
         results = [r for r in resultados_recs if r is not None]

@@ -162,8 +162,11 @@ export default function App() {
     setIsLoadingMore(true)
     const nextPage = currentPage + 1
     try {
+      const excludeParam = recommendations.map(r => r.title).join(',')
       const params = new URLSearchParams({ limit: '8', only_unseen: 'true', page: nextPage.toString() })
       if (referenceMovie) params.append('reference_movie', referenceMovie)
+      if (excludeParam) params.append('exclude', excludeParam)
+      
       const res = await fetch(`${API_BASE}/recommendations/${encodeURIComponent(username)}?${params}`, { cache: 'no-store' })
       if (!res.ok) throw new Error('Falha ao carregar mais.')
       const data = await res.json()

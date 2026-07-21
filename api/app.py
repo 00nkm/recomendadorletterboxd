@@ -73,10 +73,9 @@ async def sync_status(username: str):
     finally:
         db.close()
 
-# A rota de casal obrigatoriamente declarada antes para capturar o termo "couple"
 @app.get('/recommendations/couple')
-async def couple_recommendations(user1: str, user2: str, limit: int = 6):
-    data = await recommend_for_couple(user1, user2, limit)
+async def couple_recommendations(user1: str, user2: str, limit: int = 6, exclude: str | None = None):
+    data = await recommend_for_couple(user1, user2, limit, exclude)
     return data
 
 @app.get('/recommendations/{username}')
@@ -90,6 +89,7 @@ async def recommendations(
     min_year: int | None = None,
     max_year: int | None = None,
     only_unseen: bool = True,
+    exclude: str | None = None,
 ):
     recs = await recommend_for_user(
         username=username, 
@@ -99,7 +99,8 @@ async def recommendations(
         genre=genre, 
         min_year=min_year, 
         max_year=max_year, 
-        only_unseen=only_unseen
+        only_unseen=only_unseen,
+        exclude=exclude
     )
     return {"username": username, "page": page, "recommendations": recs}
 
